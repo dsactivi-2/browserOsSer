@@ -50,17 +50,21 @@ export class LLMRouter {
     const decision = this.routingTable.resolve(toolName)
 
     if (!this.providerPool.isAvailable(decision.provider)) {
-      this.routingTable
-        .getAll()
-        .find((m) => toolName.startsWith(m.toolPattern.replace('*', '')))
-
-      for (const provider of this.providerPool.getAvailableProviders()) {
+      const availableProviders = this.providerPool.getAvailableProviders()
+      for (const provider of availableProviders) {
         if (provider !== decision.provider) {
           return {
             provider,
             model: decision.model,
             reason: 'fallback',
           }
+        }
+      }
+
+      if (availableProviders.length === 0) {
+        return {
+          ...decision,
+          reason: 'no_providers_available',
         }
       }
     }

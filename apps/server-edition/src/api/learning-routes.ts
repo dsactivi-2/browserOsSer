@@ -267,7 +267,10 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       return c.json({ error: 'Adaptive optimizer not enabled' }, 404)
     }
     const body = await c.req.json().catch(() => ({}))
-    const sessionId = (body as Record<string, string>).sessionId
+    const sessionId =
+      body && typeof body === 'object' && 'sessionId' in body
+        ? String((body as { sessionId: unknown }).sessionId)
+        : undefined
     const result = adaptiveOptimizer.runOptimization(sessionId)
     if (!result) {
       return c.json({ message: 'Not enough entries for optimization' })

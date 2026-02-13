@@ -17,6 +17,7 @@ export const ServerEditionEnvSchema = z.object({
   CHROMIUM_PATH: z.string().optional(),
   CDP_PORT: z.coerce.number().int().default(9222),
   EXTENSION_PORT: z.coerce.number().int().default(9101),
+  EXTENSION_DIR: z.string().default('apps/controller-ext/dist'),
 
   // Server
   SERVER_PORT: z.coerce.number().int().default(9100),

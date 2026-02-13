@@ -17,6 +17,7 @@ export interface ServerEditionConfig {
     path?: string
     cdpPort: number
     extensionPort: number
+    extensionDir: string
   }
 
   // Server
@@ -61,6 +62,7 @@ export function createConfig(
       path: env.CHROMIUM_PATH,
       cdpPort: env.CDP_PORT,
       extensionPort: env.EXTENSION_PORT,
+      extensionDir: env.EXTENSION_DIR,
     },
 
     serverPort: env.SERVER_PORT,

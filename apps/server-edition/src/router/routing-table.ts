@@ -38,7 +38,13 @@ export class RoutingTable {
     // Load persisted overrides
     const rows = this.db
       .prepare('SELECT * FROM routing_overrides')
-      .all() as any[]
+      .all() as Array<{
+      tool_pattern: string
+      provider: LLMProvider
+      model: string
+      reason: string | null
+      updated_at: string
+    }>
     for (const row of rows) {
       this.overrides.set(row.tool_pattern, {
         provider: row.provider,

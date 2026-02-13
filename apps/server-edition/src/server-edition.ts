@@ -39,6 +39,7 @@ export class ServerEdition {
   private tokenBudgetManager: TokenBudgetManager | null = null
   private memoryAnalyzer: MemoryAnalyzer | null = null
   private adaptiveOptimizer: AdaptiveTokenOptimizer | null = null
+  private optimizerDb: Database | null = null
   private connectorManager: ConnectorManager | null = null
   private startTime = Date.now()
 
@@ -94,7 +95,7 @@ export class ServerEdition {
   private async launchChromium(): Promise<void> {
     const extensionPath = path.resolve(
       process.cwd(),
-      'apps/controller-ext/dist',
+      this.config.chromium.extensionDir,
     )
 
     console.log(
@@ -117,7 +118,7 @@ export class ServerEdition {
       `Starting BrowserOS server on port ${this.config.serverPort}...`,
     )
 
-    const { Application } = await import('@browseros/server/../../src/main')
+    const { Application } = await import('@browseros/server/main')
 
     const serverConfig = {
       cdpPort: this.config.chromium.cdpPort,
@@ -216,10 +217,10 @@ export class ServerEdition {
     this.tokenBudgetManager = new TokenBudgetManager()
     this.memoryAnalyzer = new MemoryAnalyzer()
 
-    const optimizerDb = new Database(this.config.dbPath, { create: true })
-    optimizerDb.exec('PRAGMA journal_mode = WAL')
+    this.optimizerDb = new Database(this.config.dbPath, { create: true })
+    this.optimizerDb.exec('PRAGMA journal_mode = WAL')
     this.adaptiveOptimizer = new AdaptiveTokenOptimizer(
-      optimizerDb,
+      this.optimizerDb,
       this.memoryStore,
       this.memoryAnalyzer,
       this.tokenBudgetManager,
@@ -313,6 +314,12 @@ export class ServerEdition {
       console.log('Adaptive optimizer stopped')
     }
 
+    if (this.optimizerDb) {
+      this.optimizerDb.close()
+      this.optimizerDb = null
+      console.log('Optimizer database closed')
+    }
+
     if (this.memoryStore) {
       this.memoryStore.close()
       console.log('Memory store closed')
@@ -334,7 +341,7 @@ export class ServerEdition {
     }
 
     if (this.taskScheduler) {
-      this.taskScheduler.stop()
+      await this.taskScheduler.stop()
       console.log('Task scheduler stopped')
     }
 

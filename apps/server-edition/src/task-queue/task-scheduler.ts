@@ -19,6 +19,7 @@ export class TaskScheduler {
   private running = false
   private activeTaskCount = 0
   private pollTimer: ReturnType<typeof setInterval> | null = null
+  private pollPromise: Promise<void> | null = null
   private eventHandlers: TaskEventHandler[] = []
 
   constructor(
@@ -49,11 +50,14 @@ export class TaskScheduler {
     this.poll()
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.running = false
     if (this.pollTimer) {
       clearInterval(this.pollTimer)
       this.pollTimer = null
+    }
+    if (this.pollPromise) {
+      await this.pollPromise.catch(() => {})
     }
   }
 
@@ -63,7 +67,19 @@ export class TaskScheduler {
 
   private async poll(): Promise<void> {
     if (!this.running) return
+    if (this.pollPromise) return
     if (this.activeTaskCount >= this.config.maxConcurrent) return
+
+    this.pollPromise = this.doPoll()
+    try {
+      await this.pollPromise
+    } finally {
+      this.pollPromise = null
+    }
+  }
+
+  private async doPoll(): Promise<void> {
+    if (!this.running) return
 
     const available = this.config.maxConcurrent - this.activeTaskCount
     const candidates = this.store.getNextPendingTasks(available * 2)

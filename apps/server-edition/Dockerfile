@@ -54,4 +54,4 @@ EXPOSE 9100 6080 5900
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:9100/health || exit 1
 
-ENTRYPOINT ["bun", "apps/server-edition/src/index.ts"]
+ENTRYPOINT ["bun", "apps/server-edition/dist/index.js"]
