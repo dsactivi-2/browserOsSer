@@ -269,7 +269,7 @@ export class TaskStore {
     const rows = this.db
       .prepare(`
       SELECT * FROM tasks
-      WHERE state IN ('pending', 'queued')
+      WHERE state IN ('pending', 'queued', 'waiting_dependency')
       ORDER BY ${priorityOrder}, created_at ASC
       LIMIT ?
     `)

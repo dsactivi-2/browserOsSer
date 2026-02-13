@@ -132,8 +132,12 @@ export class TaskScheduler {
         this.retryManager.shouldRetry(task.retryCount, task.retryPolicy)
       ) {
         const newCount = this.store.incrementRetry(event.taskId)
-        await this.retryManager.waitForRetry(newCount, task.retryPolicy)
-        this.store.updateState(event.taskId, 'pending')
+        // Schedule retry non-blocking to avoid holding the concurrency slot
+        this.retryManager.waitForRetry(newCount, task.retryPolicy).then(() => {
+          if (this.running) {
+            this.store.updateState(event.taskId, 'pending')
+          }
+        })
         return
       }
     }
