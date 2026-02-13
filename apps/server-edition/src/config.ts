@@ -40,6 +40,9 @@ export interface ServerEditionConfig {
   browserPool: {
     maxInstances: number
   }
+
+  // Optional override for controller extension path
+  extensionPath?: string
 }
 
 export function createConfig(
@@ -81,5 +84,7 @@ export function createConfig(
     browserPool: {
       maxInstances: env.BROWSER_POOL_MAX,
     },
+
+    extensionPath: env.EXTENSION_PATH || undefined,
   }
 }

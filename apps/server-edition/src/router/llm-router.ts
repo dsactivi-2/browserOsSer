@@ -51,21 +51,19 @@ export class LLMRouter {
 
     if (!this.providerPool.isAvailable(decision.provider)) {
       const availableProviders = this.providerPool.getAvailableProviders()
-      for (const provider of availableProviders) {
-        if (provider !== decision.provider) {
-          return {
-            provider,
-            model: decision.model,
-            reason: 'fallback',
-          }
+      const fallback = availableProviders.find((p) => p !== decision.provider)
+
+      if (fallback) {
+        return {
+          provider: fallback,
+          model: decision.model,
+          reason: 'fallback',
         }
       }
 
-      if (availableProviders.length === 0) {
-        return {
-          ...decision,
-          reason: 'no_providers_available',
-        }
+      return {
+        ...decision,
+        reason: 'no_available_provider',
       }
     }
 

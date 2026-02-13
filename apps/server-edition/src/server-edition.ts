@@ -93,10 +93,8 @@ export class ServerEdition {
   }
 
   private async launchChromium(): Promise<void> {
-    const extensionPath = path.resolve(
-      process.cwd(),
-      this.config.chromium.extensionDir,
-    )
+    const extensionPath = this.config.extensionPath
+      ?? path.resolve(process.cwd(), this.config.chromium.extensionDir ?? 'apps/controller-ext/dist')
 
     console.log(
       `Launching Chromium (CDP port: ${this.config.chromium.cdpPort})...`,

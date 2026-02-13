@@ -268,7 +268,7 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
     }
     const body = await c.req.json().catch(() => ({}))
     const sessionId =
-      body && typeof body === 'object' && 'sessionId' in body
+      typeof body === 'object' && body !== null && 'sessionId' in body
         ? String((body as { sessionId: unknown }).sessionId)
         : undefined
     const result = adaptiveOptimizer.runOptimization(sessionId)

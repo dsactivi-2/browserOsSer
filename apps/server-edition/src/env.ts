@@ -35,6 +35,9 @@ export const ServerEditionEnvSchema = z.object({
 
   // Browser Pool
   BROWSER_POOL_MAX: z.coerce.number().int().min(1).default(1),
+
+  // Extension path override
+  EXTENSION_PATH: z.string().optional(),
 })
 
 export type ServerEditionEnv = z.infer<typeof ServerEditionEnvSchema>
