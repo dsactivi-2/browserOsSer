@@ -1,0 +1,88 @@
+{
+  "name": "@browseros/learning",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "exports": {
+    "./memory/types": {
+      "types": "./src/memory/types.ts",
+      "default": "./src/memory/types.ts"
+    },
+    "./memory/memory-store": {
+      "types": "./src/memory/memory-store.ts",
+      "default": "./src/memory/memory-store.ts"
+    },
+    "./memory/vector-db": {
+      "types": "./src/memory/vector-db.ts",
+      "default": "./src/memory/vector-db.ts"
+    },
+    "./memory/persistent-session": {
+      "types": "./src/memory/persistent-session.ts",
+      "default": "./src/memory/persistent-session.ts"
+    },
+    "./memory/cross-session-store": {
+      "types": "./src/memory/cross-session-store.ts",
+      "default": "./src/memory/cross-session-store.ts"
+    },
+    "./memory/token-budget-manager": {
+      "types": "./src/memory/token-budget-manager.ts",
+      "default": "./src/memory/token-budget-manager.ts"
+    },
+    "./memory/memory-compressor": {
+      "types": "./src/memory/memory-compressor.ts",
+      "default": "./src/memory/memory-compressor.ts"
+    },
+    "./memory/memory-analyzer": {
+      "types": "./src/memory/memory-analyzer.ts",
+      "default": "./src/memory/memory-analyzer.ts"
+    },
+    "./reasoning-bank/types": {
+      "types": "./src/reasoning-bank/types.ts",
+      "default": "./src/reasoning-bank/types.ts"
+    },
+    "./reasoning-bank/reasoning-bank": {
+      "types": "./src/reasoning-bank/reasoning-bank.ts",
+      "default": "./src/reasoning-bank/reasoning-bank.ts"
+    },
+    "./reasoning-bank/pattern-matcher": {
+      "types": "./src/reasoning-bank/pattern-matcher.ts",
+      "default": "./src/reasoning-bank/pattern-matcher.ts"
+    },
+    "./feedback-loop/types": {
+      "types": "./src/feedback-loop/types.ts",
+      "default": "./src/feedback-loop/types.ts"
+    },
+    "./feedback-loop/feedback-collector": {
+      "types": "./src/feedback-loop/feedback-collector.ts",
+      "default": "./src/feedback-loop/feedback-collector.ts"
+    },
+    "./feedback-loop/training-exporter": {
+      "types": "./src/feedback-loop/training-exporter.ts",
+      "default": "./src/feedback-loop/training-exporter.ts"
+    },
+    "./prompt-evolution/types": {
+      "types": "./src/prompt-evolution/types.ts",
+      "default": "./src/prompt-evolution/types.ts"
+    },
+    "./prompt-evolution/prompt-registry": {
+      "types": "./src/prompt-evolution/prompt-registry.ts",
+      "default": "./src/prompt-evolution/prompt-registry.ts"
+    },
+    "./prompt-evolution/ab-tester": {
+      "types": "./src/prompt-evolution/ab-tester.ts",
+      "default": "./src/prompt-evolution/ab-tester.ts"
+    },
+    "./prompt-evolution/auto-promoter": {
+      "types": "./src/prompt-evolution/auto-promoter.ts",
+      "default": "./src/prompt-evolution/auto-promoter.ts"
+    }
+  }
+}
