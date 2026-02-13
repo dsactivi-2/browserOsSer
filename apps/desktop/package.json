@@ -1,0 +1,99 @@
+{
+  "name": "@browseros/desktop",
+  "version": "0.1.0",
+  "description": "BrowserOS Desktop — native macOS app for local browser automation",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "bun run build:main && electron dist/main.js",
+    "build:main": "bun build src/main.ts src/preload.ts --outdir=dist --target=node",
+    "build:renderer": "bun build src/renderer.ts --outdir=dist --target=browser",
+    "build": "bun run build:main && bun run build:renderer && cp src/index.html dist/",
+    "pack": "bun run build && electron-builder --dir",
+    "dist": "bun run build && electron-builder --mac",
+    "dist:dmg": "bun run build && electron-builder --mac dmg"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "33.0.0",
+    "electron-builder": "25.1.0"
+  },
+  "build": {
+    "appId": "com.browseros.desktop",
+    "productName": "BrowserOS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../server-edition/src",
+        "to": "server-edition",
+        "filter": [
+          "**/*.ts",
+          "**/*.json"
+        ]
+      },
+      {
+        "from": "../server/src",
+        "to": "server",
+        "filter": [
+          "**/*.ts",
+          "**/*.json"
+        ]
+      },
+      {
+        "from": "../controller-ext/dist",
+        "to": "controller-ext"
+      },
+      {
+        "from": "../../packages",
+        "to": "packages",
+        "filter": [
+          "**/*.ts",
+          "**/*.json",
+          "!**/node_modules/**"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "BrowserOS ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  }
+}
