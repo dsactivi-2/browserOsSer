@@ -5,6 +5,8 @@ export interface ConnectorRoutesDeps {
   connectorManager: ConnectorManager
 }
 
+const VALID_CONNECTOR_TYPES = ['rest', 'webhook'] as const
+
 export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
   const { connectorManager } = deps
   const app = new Hono()
@@ -12,7 +14,28 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
   app.get('/', (c) => c.json(connectorManager.listConnectors()))
 
   app.post('/', async (c) => {
-    const { type, name, config } = await c.req.json()
+    const body = await c.req.json()
+    const { type, name, config } = body
+
+    if (!type || typeof type !== 'string') {
+      return c.json({ error: 'type is required and must be a string' }, 400)
+    }
+    if (
+      !VALID_CONNECTOR_TYPES.includes(
+        type as (typeof VALID_CONNECTOR_TYPES)[number],
+      )
+    ) {
+      return c.json(
+        {
+          error: `Invalid type. Must be one of: ${VALID_CONNECTOR_TYPES.join(', ')}`,
+        },
+        400,
+      )
+    }
+    if (!name || typeof name !== 'string' || name.length > 100) {
+      return c.json({ error: 'name is required (string, max 100 chars)' }, 400)
+    }
+
     try {
       const id = await connectorManager.addConnector(type, name, config ?? {})
       return c.json({ id, type, name }, 201)
@@ -37,7 +60,13 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
 
   app.post('/:id/toggle', async (c) => {
     const id = c.req.param('id')
-    const { enabled } = await c.req.json()
+    const body = await c.req.json()
+    const { enabled } = body
+
+    if (typeof enabled !== 'boolean') {
+      return c.json({ error: 'enabled must be a boolean' }, 400)
+    }
+
     connectorManager.setEnabled(id, enabled)
     return c.json({ id, enabled })
   })

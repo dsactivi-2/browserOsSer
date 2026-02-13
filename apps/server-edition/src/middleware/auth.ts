@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { createMiddleware } from 'hono/factory'
 
 export interface AuthConfig {
@@ -5,9 +6,13 @@ export interface AuthConfig {
   excludePaths: string[]
 }
 
+function timingSafeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
+
 export function createAuthMiddleware(config: AuthConfig) {
   return createMiddleware(async (c, next) => {
-    // Skip auth for excluded paths (health check, etc.)
     const path = c.req.path
     if (config.excludePaths.some((p) => path.startsWith(p))) {
       return next()
@@ -17,7 +22,7 @@ export function createAuthMiddleware(config: AuthConfig) {
       c.req.header('X-API-Key') ??
       c.req.header('Authorization')?.replace('Bearer ', '')
 
-    if (!apiKey || !config.apiKeys.includes(apiKey)) {
+    if (!apiKey || !config.apiKeys.some((k) => timingSafeCompare(k, apiKey))) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
