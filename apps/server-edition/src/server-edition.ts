@@ -1,4 +1,6 @@
+import { Database } from 'bun:sqlite'
 import path from 'node:path'
+import { AdaptiveTokenOptimizer } from '@browseros/learning/memory/adaptive-optimizer'
 import { CrossSessionStore } from '@browseros/learning/memory/cross-session-store'
 import { MemoryAnalyzer } from '@browseros/learning/memory/memory-analyzer'
 import { MemoryStore } from '@browseros/learning/memory/memory-store'
@@ -36,6 +38,7 @@ export class ServerEdition {
   private crossSessionStore: CrossSessionStore | null = null
   private tokenBudgetManager: TokenBudgetManager | null = null
   private memoryAnalyzer: MemoryAnalyzer | null = null
+  private adaptiveOptimizer: AdaptiveTokenOptimizer | null = null
   private connectorManager: ConnectorManager | null = null
   private startTime = Date.now()
 
@@ -213,6 +216,17 @@ export class ServerEdition {
     this.tokenBudgetManager = new TokenBudgetManager()
     this.memoryAnalyzer = new MemoryAnalyzer()
 
+    const optimizerDb = new Database(this.config.dbPath, { create: true })
+    optimizerDb.exec('PRAGMA journal_mode = WAL')
+    this.adaptiveOptimizer = new AdaptiveTokenOptimizer(
+      optimizerDb,
+      this.memoryStore,
+      this.memoryAnalyzer,
+      this.tokenBudgetManager,
+    )
+    this.adaptiveOptimizer.start()
+    console.log('Adaptive token optimizer started (auto-adjusts every 2min)')
+
     // Mount learning routes on the existing application
     if (this.application?.app) {
       const learningApp = createLearningRoutes({
@@ -221,6 +235,7 @@ export class ServerEdition {
         crossSessionStore: this.crossSessionStore,
         tokenBudgetManager: this.tokenBudgetManager,
         memoryAnalyzer: this.memoryAnalyzer,
+        adaptiveOptimizer: this.adaptiveOptimizer,
       })
       this.application.app.route('/learning', learningApp)
       console.log(
@@ -291,6 +306,11 @@ export class ServerEdition {
     if (this.connectorManager) {
       await this.connectorManager.shutdownAll()
       console.log('Connectors shut down')
+    }
+
+    if (this.adaptiveOptimizer) {
+      this.adaptiveOptimizer.stop()
+      console.log('Adaptive optimizer stopped')
     }
 
     if (this.memoryStore) {

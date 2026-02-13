@@ -44,6 +44,10 @@
       "types": "./src/memory/memory-analyzer.ts",
       "default": "./src/memory/memory-analyzer.ts"
     },
+    "./memory/adaptive-optimizer": {
+      "types": "./src/memory/adaptive-optimizer.ts",
+      "default": "./src/memory/adaptive-optimizer.ts"
+    },
     "./reasoning-bank/types": {
       "types": "./src/reasoning-bank/types.ts",
       "default": "./src/reasoning-bank/types.ts"

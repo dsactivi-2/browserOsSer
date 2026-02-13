@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+import type { AdaptiveTokenOptimizer } from '@browseros/learning/memory/adaptive-optimizer'
 import type {
   CrossSessionStore,
   KnowledgeCategory,
@@ -50,6 +51,7 @@ export interface LearningRoutesDeps {
   crossSessionStore: CrossSessionStore
   tokenBudgetManager: TokenBudgetManager
   memoryAnalyzer: MemoryAnalyzer
+  adaptiveOptimizer?: AdaptiveTokenOptimizer
 }
 
 export function createLearningRoutes(deps: LearningRoutesDeps) {
@@ -59,6 +61,7 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
     crossSessionStore,
     tokenBudgetManager,
     memoryAnalyzer,
+    adaptiveOptimizer,
   } = deps
   const app = new Hono()
 
@@ -245,6 +248,41 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       },
       201,
     )
+  })
+
+  // GET /learning/optimizer/status — Current adaptive parameters and efficiency
+  app.get('/optimizer/status', async (c) => {
+    if (!adaptiveOptimizer) {
+      return c.json({ error: 'Adaptive optimizer not enabled' }, 404)
+    }
+    return c.json({
+      parameters: adaptiveOptimizer.getCurrentParameters(),
+      efficiency: adaptiveOptimizer.getEfficiencyReport(),
+    })
+  })
+
+  // POST /learning/optimizer/run — Trigger manual optimization run
+  app.post('/optimizer/run', async (c) => {
+    if (!adaptiveOptimizer) {
+      return c.json({ error: 'Adaptive optimizer not enabled' }, 404)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const sessionId = (body as Record<string, string>).sessionId
+    const result = adaptiveOptimizer.runOptimization(sessionId)
+    if (!result) {
+      return c.json({ message: 'Not enough entries for optimization' })
+    }
+    return c.json(result)
+  })
+
+  // GET /learning/optimizer/history — Optimization history
+  app.get('/optimizer/history', async (c) => {
+    if (!adaptiveOptimizer) {
+      return c.json({ error: 'Adaptive optimizer not enabled' }, 404)
+    }
+    const limitStr = c.req.query('limit')
+    const limit = limitStr ? Number.parseInt(limitStr, 10) : 20
+    return c.json({ history: adaptiveOptimizer.getHistory(limit) })
   })
 
   return app
