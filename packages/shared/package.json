@@ -48,6 +48,18 @@
     "./schemas/browser-context": {
       "types": "./src/schemas/browser-context.ts",
       "default": "./src/schemas/browser-context.ts"
+    },
+    "./schemas/task": {
+      "types": "./src/schemas/task.ts",
+      "default": "./src/schemas/task.ts"
+    },
+    "./constants/task-queue": {
+      "types": "./src/constants/task-queue.ts",
+      "default": "./src/constants/task-queue.ts"
+    },
+    "./constants/router": {
+      "types": "./src/constants/router.ts",
+      "default": "./src/constants/router.ts"
     }
   }
 }

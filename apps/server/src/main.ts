@@ -36,6 +36,7 @@ import { VERSION } from './version'
 export class Application {
   private config: ServerConfig
   private db: Database | null = null
+  private httpResult: Awaited<ReturnType<typeof createHttpServer>> | null = null
 
   constructor(config: ServerConfig) {
     this.config = config
@@ -73,7 +74,7 @@ export class Application {
     const mutexPool = new MutexPool()
 
     try {
-      await createHttpServer({
+      this.httpResult = await createHttpServer({
         port: this.config.serverPort,
         host: '0.0.0.0',
         version: VERSION,
@@ -111,6 +112,14 @@ export class Application {
     // Immediate exit without graceful shutdown. Chromium may kill us on update/restart,
     // and we need to free the port instantly so the HTTP port doesn't keep switching.
     process.exit(EXIT_CODES.SUCCESS)
+  }
+
+  getHttpApp() {
+    return this.httpResult?.app ?? null
+  }
+
+  getHttpServer() {
+    return this.httpResult?.server ?? null
   }
 
   private initCoreServices(): void {

@@ -36,6 +36,10 @@
       "types": "./src/agent/errors.ts",
       "default": "./src/agent/errors.ts"
     },
+    "./main": {
+      "types": "./src/main.ts",
+      "default": "./src/main.ts"
+    },
     "./lib/clients/gateway": {
       "types": "./src/lib/clients/gateway.ts",
       "default": "./src/lib/clients/gateway.ts"

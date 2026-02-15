@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  browseros-server:
+    build:
+      context: ../..
+      dockerfile: apps/server-edition/Dockerfile
+    ports:
+      - "9100:9100"    # HTTP API
+      - "6080:6080"    # noVNC web viewer
+    environment:
+      - BROWSEROS_MODE=server
+      - VNC_ENABLED=true
+      - VNC_PASSWORD=${VNC_PASSWORD:-}
+    volumes:
+      - browseros-data:/app/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+        reservations:
+          memory: 1g
+
+volumes:
+  browseros-data:
+    driver: local
