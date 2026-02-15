@@ -26,5 +26,10 @@ export interface AggregatedMetrics {
 export interface RouteDecision {
   provider: LLMProvider
   model: string
-  reason: 'default' | 'optimized' | 'fallback' | 'downgrade_test'
+  reason:
+    | 'default'
+    | 'optimized'
+    | 'fallback'
+    | 'downgrade_test'
+    | 'no_available_provider'
 }

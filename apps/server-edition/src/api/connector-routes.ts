@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
+import type { ConnectorType } from '../connectors/connector-interface'
 import type { ConnectorManager } from '../connectors/connector-manager'
 
 export interface ConnectorRoutesDeps {
   connectorManager: ConnectorManager
 }
 
-const VALID_CONNECTOR_TYPES = ['rest', 'webhook'] as const
+const VALID_CONNECTOR_TYPES: ConnectorType[] = ['rest', 'webhook']
 
 export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
   const { connectorManager } = deps
@@ -20,11 +21,7 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
     if (!type || typeof type !== 'string') {
       return c.json({ error: 'type is required and must be a string' }, 400)
     }
-    if (
-      !VALID_CONNECTOR_TYPES.includes(
-        type as (typeof VALID_CONNECTOR_TYPES)[number],
-      )
-    ) {
+    if (!VALID_CONNECTOR_TYPES.includes(type as ConnectorType)) {
       return c.json(
         {
           error: `Invalid type. Must be one of: ${VALID_CONNECTOR_TYPES.join(', ')}`,
@@ -37,7 +34,11 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
     }
 
     try {
-      const id = await connectorManager.addConnector(type, name, config ?? {})
+      const id = await connectorManager.addConnector(
+        type as ConnectorType,
+        name,
+        config ?? {},
+      )
       return c.json({ id, type, name }, 201)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
