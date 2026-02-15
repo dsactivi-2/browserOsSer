@@ -236,7 +236,7 @@ export class AdaptiveTokenOptimizer {
     usageRatio: number,
     tokensBefore: number,
     tokensAfter: number,
-    budget: number,
+    _budget: number,
   ): void {
     const target = this.config.targetUsageRatio
     const lr = this.config.learningRate
@@ -380,7 +380,9 @@ export class AdaptiveTokenOptimizer {
     totalOptimizations: number
     totalTokensSaved: number
     avgSavingsPerRun: number
-    currentParameters: ReturnType<typeof this.getCurrentParameters>
+    currentParameters: ReturnType<
+      AdaptiveTokenOptimizer['getCurrentParameters']
+    >
   } {
     const history = this.getHistory(100)
     const totalSaved = history.reduce(

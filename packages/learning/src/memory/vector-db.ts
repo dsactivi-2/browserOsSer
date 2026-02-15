@@ -66,7 +66,11 @@ export class VectorDB {
     query += ' ORDER BY created_at DESC LIMIT ?'
     params.push(BATCH_LIMIT)
 
-    const rows = this.db.prepare(query).all(...params) as any[]
+    const rows = this.db.prepare(query).all(...params) as Array<{
+      id: string
+      embedding: Buffer
+      dimension: number
+    }>
 
     const results: Array<{ id: string; similarity: number }> = []
     const queryVec = new Float32Array(queryEmbedding)
@@ -105,7 +109,7 @@ export class VectorDB {
   count(): number {
     const row = this.db
       .prepare('SELECT COUNT(*) as count FROM memory_vectors')
-      .get() as any
+      .get() as { count: number } | undefined
     return row?.count ?? 0
   }
 

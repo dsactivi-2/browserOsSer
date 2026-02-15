@@ -1,6 +1,21 @@
 import { Database } from 'bun:sqlite'
 import type { ExecutionPattern, PatternMatch, PatternQuery } from './types'
 
+interface PatternRow {
+  id: string
+  task_type: string
+  tool_sequence: string
+  input_summary: string
+  output_summary: string
+  success: number
+  duration_ms: number
+  tool_count: number
+  retry_count: number
+  confidence: number
+  embedding: Buffer | null
+  created_at: string
+}
+
 export class ReasoningBank {
   private db: Database
 
@@ -76,7 +91,7 @@ export class ReasoningBank {
       .prepare(`
       SELECT * FROM execution_patterns ${where} ORDER BY confidence DESC, created_at DESC LIMIT ?
     `)
-      .all(...params, limit) as any[]
+      .all(...params, limit) as PatternRow[]
 
     const queryWords = new Set(query.taskDescription.toLowerCase().split(/\s+/))
 
@@ -110,7 +125,7 @@ export class ReasoningBank {
         .prepare(
           'SELECT * FROM execution_patterns WHERE task_type = ? ORDER BY confidence DESC LIMIT ?',
         )
-        .all(taskType, limit) as any[]
+        .all(taskType, limit) as PatternRow[]
     ).map(this.rowToPattern)
   }
 
@@ -138,9 +153,9 @@ export class ReasoningBank {
   } {
     const total =
       (
-        this.db
-          .prepare('SELECT COUNT(*) as c FROM execution_patterns')
-          .get() as any
+        this.db.prepare('SELECT COUNT(*) as c FROM execution_patterns').get() as
+          | { c: number }
+          | undefined
       )?.c ?? 0
     const successful =
       (
@@ -148,19 +163,19 @@ export class ReasoningBank {
           .prepare(
             'SELECT COUNT(*) as c FROM execution_patterns WHERE success = 1',
           )
-          .get() as any
+          .get() as { c: number } | undefined
       )?.c ?? 0
     const avg =
       (
         this.db
           .prepare('SELECT AVG(confidence) as a FROM execution_patterns')
-          .get() as any
+          .get() as { a: number } | undefined
       )?.a ?? 0
     const types = this.db
       .prepare(
         'SELECT task_type, COUNT(*) as c FROM execution_patterns GROUP BY task_type',
       )
-      .all() as any[]
+      .all() as Array<{ task_type: string; c: number }>
     const byType: Record<string, number> = {}
     for (const t of types) byType[t.task_type] = t.c
     return {
@@ -175,7 +190,7 @@ export class ReasoningBank {
     this.db.close()
   }
 
-  private rowToPattern(row: any): ExecutionPattern {
+  private rowToPattern(row: PatternRow): ExecutionPattern {
     return {
       id: row.id,
       taskType: row.task_type,
