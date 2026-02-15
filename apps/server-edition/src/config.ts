@@ -49,8 +49,14 @@ export function createConfig(
   env: ServerEditionEnv,
   cliMode?: string,
 ): ServerEditionConfig {
+  const validModes = ['local', 'server'] as const
+  const mode =
+    cliMode && validModes.includes(cliMode as 'local' | 'server')
+      ? (cliMode as 'local' | 'server')
+      : env.BROWSEROS_MODE
+
   return {
-    mode: (cliMode as 'local' | 'server') ?? env.BROWSEROS_MODE,
+    mode,
 
     xvfb: {
       display: env.XVFB_DISPLAY,

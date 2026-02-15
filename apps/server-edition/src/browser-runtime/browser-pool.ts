@@ -15,6 +15,7 @@ export class BrowserPool {
     string,
     { launcher: ChromiumLauncher; status: BrowserInstance['status'] }
   >()
+  private nextPortOffset = 0
 
   constructor(config: BrowserPoolConfig) {
     this.config = config
@@ -26,7 +27,7 @@ export class BrowserPool {
     }
 
     const instanceId = id ?? crypto.randomUUID()
-    const port = this.config.basePort + this.instances.size
+    const port = this.config.basePort + this.nextPortOffset++
 
     const launcher = new ChromiumLauncher({
       executablePath: this.config.chromiumPath,

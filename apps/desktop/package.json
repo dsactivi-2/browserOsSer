@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "bun run build:main && electron dist/main.js",
-    "build:main": "bun build src/main.ts src/preload.ts --outdir=dist --target=node",
+    "build:main": "bun build src/main.ts src/preload.ts --outdir=dist --target=node --format=cjs",
     "build:renderer": "bun build src/renderer.ts --outdir=dist --target=browser",
     "build": "bun run build:main && bun run build:renderer && cp src/index.html dist/",
     "pack": "bun run build && electron-builder --dir",

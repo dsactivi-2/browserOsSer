@@ -104,18 +104,18 @@ export class VncProxy {
       const ws = this.websockify
       promises.push(
         new Promise((resolve) => {
+          const killTimer = setTimeout(() => {
+            if (this.websockify && !this.websockify.killed) {
+              this.websockify.kill('SIGKILL')
+            }
+          }, 5000)
+
           ws.on('exit', () => {
+            clearTimeout(killTimer)
             this.websockify = null
             resolve()
           })
           ws.kill('SIGTERM')
-          setTimeout(() => {
-            if (this.websockify) {
-              this.websockify.kill('SIGKILL')
-              this.websockify = null
-              resolve()
-            }
-          }, 5000)
         }),
       )
     }
@@ -124,18 +124,18 @@ export class VncProxy {
       const vnc = this.x11vnc
       promises.push(
         new Promise((resolve) => {
+          const killTimer = setTimeout(() => {
+            if (this.x11vnc && !this.x11vnc.killed) {
+              this.x11vnc.kill('SIGKILL')
+            }
+          }, 5000)
+
           vnc.on('exit', () => {
+            clearTimeout(killTimer)
             this.x11vnc = null
             resolve()
           })
           vnc.kill('SIGTERM')
-          setTimeout(() => {
-            if (this.x11vnc) {
-              this.x11vnc.kill('SIGKILL')
-              this.x11vnc = null
-              resolve()
-            }
-          }, 5000)
         }),
       )
     }

@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type {
   Connector,
   ConnectorConfig,
@@ -11,9 +11,8 @@ export class ConnectorManager {
   private connectors = new Map<string, Connector>()
   private configs = new Map<string, ConnectorConfig>()
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -131,6 +130,6 @@ export class ConnectorManager {
       await connector.shutdown().catch(() => {})
     }
     this.connectors.clear()
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 }

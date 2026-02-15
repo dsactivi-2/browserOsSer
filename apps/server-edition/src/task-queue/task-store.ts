@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type {
   TaskDefinition,
   TaskPriority,
@@ -11,10 +11,8 @@ import type { StoredTask, TaskQueueStats } from './types'
 export class TaskStore {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
-    this.db.exec('PRAGMA foreign_keys = ON')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -303,7 +301,7 @@ export class TaskStore {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 
   private rowToTask(row: any): StoredTask {

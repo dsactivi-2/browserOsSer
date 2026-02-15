@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type {
   MemoryEntry,
   MemorySearchResult,
@@ -11,10 +11,9 @@ export class MemoryStore {
   private vectorDb: VectorDB
   private config: MemoryStoreConfig
 
-  constructor(config: MemoryStoreConfig) {
+  constructor(db: Database, config: MemoryStoreConfig) {
     this.config = config
-    this.db = new Database(config.dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+    this.db = db
     this.vectorDb = new VectorDB(this.db)
     this.initialize()
   }
@@ -65,7 +64,7 @@ export class MemoryStore {
       )
 
     if (entry.embedding) {
-      this.vectorDb.store(id, entry.embedding)
+      this.vectorDb.store(id, entry.embedding, entry.sessionId)
     }
     return id
   }
@@ -102,8 +101,15 @@ export class MemoryStore {
   searchByVector(
     queryEmbedding: number[],
     limit: number = 10,
+    minSimilarity: number = 0.0,
+    sessionId?: string,
   ): MemorySearchResult[] {
-    const vectorResults = this.vectorDb.search(queryEmbedding, limit)
+    const vectorResults = this.vectorDb.search(
+      queryEmbedding,
+      limit,
+      minSimilarity,
+      sessionId,
+    )
     return vectorResults
       .map((vr) => ({
         entry: this.get(vr.id)!,
@@ -178,7 +184,7 @@ export class MemoryStore {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 
   private rowToEntry(row: any): MemoryEntry {

@@ -1,4 +1,3 @@
-import { Database } from 'bun:sqlite'
 import path from 'node:path'
 import { AdaptiveTokenOptimizer } from '@browseros/learning/memory/adaptive-optimizer'
 import { CrossSessionStore } from '@browseros/learning/memory/cross-session-store'
@@ -18,6 +17,7 @@ import type { ServerEditionConfig } from './config'
 import { ConnectorManager } from './connectors/connector-manager'
 import { RestConnector } from './connectors/rest/rest-connector'
 import { WebhookConnector } from './connectors/webhook/webhook-connector'
+import { DatabaseProvider } from './database'
 import { createAuthMiddleware } from './middleware/auth'
 import { createRequestLogger } from './middleware/request-logger'
 import { LLMRouter } from './router/llm-router'
@@ -39,7 +39,6 @@ export class ServerEdition {
   private tokenBudgetManager: TokenBudgetManager | null = null
   private memoryAnalyzer: MemoryAnalyzer | null = null
   private adaptiveOptimizer: AdaptiveTokenOptimizer | null = null
-  private optimizerDb: Database | null = null
   private connectorManager: ConnectorManager | null = null
   private startTime = Date.now()
 
@@ -49,6 +48,10 @@ export class ServerEdition {
 
   async start(): Promise<void> {
     console.log(`Starting BrowserOS Server Edition (mode: ${this.config.mode})`)
+
+    // Initialize shared database (single connection for all stores)
+    DatabaseProvider.create(this.config.dbPath)
+    console.log(`Database initialized at ${this.config.dbPath} (WAL mode)`)
 
     if (this.config.mode === 'server') {
       await this.startXvfb()
@@ -93,8 +96,12 @@ export class ServerEdition {
   }
 
   private async launchChromium(): Promise<void> {
-    const extensionPath = this.config.extensionPath
-      ?? path.resolve(process.cwd(), this.config.chromium.extensionDir ?? 'apps/controller-ext/dist')
+    const extensionPath =
+      this.config.extensionPath ??
+      path.resolve(
+        process.cwd(),
+        this.config.chromium.extensionDir ?? 'apps/controller-ext/dist',
+      )
 
     console.log(
       `Launching Chromium (CDP port: ${this.config.chromium.cdpPort})...`,
@@ -152,7 +159,8 @@ export class ServerEdition {
 
   private async initializeTaskQueue(): Promise<void> {
     console.log('Initializing task queue...')
-    this.taskStore = new TaskStore(this.config.dbPath)
+    const db = DatabaseProvider.get()!
+    this.taskStore = new TaskStore(db)
     this.taskScheduler = new TaskScheduler(
       this.taskStore,
       { serverPort: this.config.serverPort },
@@ -160,12 +168,12 @@ export class ServerEdition {
     )
 
     // Mount task routes on the existing application
-    if (this.application?.app) {
+    if (this.application?.getHttpApp()) {
       const taskApp = createTaskRoutes({
         taskStore: this.taskStore,
         taskScheduler: this.taskScheduler,
       })
-      this.application.app.route('/tasks', taskApp)
+      this.application.getHttpApp().route('/tasks', taskApp)
       console.log(
         `Task API mounted at http://127.0.0.1:${this.config.serverPort}/tasks`,
       )
@@ -178,17 +186,18 @@ export class ServerEdition {
 
   private async initializeRouter(): Promise<void> {
     console.log('Initializing LLM router...')
+    const db = DatabaseProvider.get()!
     this.llmRouter = new LLMRouter({
-      dbPath: this.config.dbPath,
+      db,
       enableSelfLearning: true,
     })
 
     // Mount router routes on the existing application
-    if (this.application?.app) {
+    if (this.application?.getHttpApp()) {
       const routerApp = createRouterRoutes({
         llmRouter: this.llmRouter,
       })
-      this.application.app.route('/router', routerApp)
+      this.application.getHttpApp().route('/router', routerApp)
       console.log(
         `Router API mounted at http://127.0.0.1:${this.config.serverPort}/router`,
       )
@@ -201,8 +210,9 @@ export class ServerEdition {
 
   private async initializeMemory(): Promise<void> {
     console.log('Initializing memory system...')
+    const db = DatabaseProvider.get()!
 
-    this.memoryStore = new MemoryStore({
+    this.memoryStore = new MemoryStore(db, {
       dbPath: this.config.dbPath,
       maxShortTermTokens: 190_000,
       compressionThreshold: 0.7,
@@ -210,15 +220,13 @@ export class ServerEdition {
       embeddingDimension: 384,
     })
 
-    this.sessionManager = new PersistentSessionManager(this.config.dbPath)
-    this.crossSessionStore = new CrossSessionStore(this.config.dbPath)
+    this.sessionManager = new PersistentSessionManager(db)
+    this.crossSessionStore = new CrossSessionStore(db)
     this.tokenBudgetManager = new TokenBudgetManager()
     this.memoryAnalyzer = new MemoryAnalyzer()
 
-    this.optimizerDb = new Database(this.config.dbPath, { create: true })
-    this.optimizerDb.exec('PRAGMA journal_mode = WAL')
     this.adaptiveOptimizer = new AdaptiveTokenOptimizer(
-      this.optimizerDb,
+      db,
       this.memoryStore,
       this.memoryAnalyzer,
       this.tokenBudgetManager,
@@ -227,7 +235,7 @@ export class ServerEdition {
     console.log('Adaptive token optimizer started (auto-adjusts every 2min)')
 
     // Mount learning routes on the existing application
-    if (this.application?.app) {
+    if (this.application?.getHttpApp()) {
       const learningApp = createLearningRoutes({
         memoryStore: this.memoryStore,
         sessionManager: this.sessionManager,
@@ -236,7 +244,7 @@ export class ServerEdition {
         memoryAnalyzer: this.memoryAnalyzer,
         adaptiveOptimizer: this.adaptiveOptimizer,
       })
-      this.application.app.route('/learning', learningApp)
+      this.application.getHttpApp().route('/learning', learningApp)
       console.log(
         `Learning API mounted at http://127.0.0.1:${this.config.serverPort}/learning`,
       )
@@ -246,10 +254,10 @@ export class ServerEdition {
   }
 
   private applyMiddleware(): void {
-    if (!this.application?.app) return
-    this.application.app.use('*', createRequestLogger())
+    if (!this.application?.getHttpApp()) return
+    this.application.getHttpApp().use('*', createRequestLogger())
     if (this.config.auth.enabled) {
-      this.application.app.use(
+      this.application.getHttpApp().use(
         '*',
         createAuthMiddleware({
           apiKeys: this.config.auth.apiKeys,
@@ -262,18 +270,19 @@ export class ServerEdition {
 
   private async initializeConnectors(): Promise<void> {
     console.log('Initializing connector system...')
-    this.connectorManager = new ConnectorManager(this.config.dbPath)
+    const db = DatabaseProvider.get()!
+    this.connectorManager = new ConnectorManager(db)
     this.connectorManager.registerFactory('rest', () => new RestConnector())
     this.connectorManager.registerFactory(
       'webhook',
       () => new WebhookConnector(),
     )
 
-    if (this.application?.app) {
+    if (this.application?.getHttpApp()) {
       const connectorApp = createConnectorRoutes({
         connectorManager: this.connectorManager,
       })
-      this.application.app.route('/connectors', connectorApp)
+      this.application.getHttpApp().route('/connectors', connectorApp)
       console.log(
         `Connector API mounted at http://127.0.0.1:${this.config.serverPort}/connectors`,
       )
@@ -282,7 +291,7 @@ export class ServerEdition {
   }
 
   private initializeHealth(): void {
-    if (!this.application?.app) return
+    if (!this.application?.getHttpApp()) return
     const healthApp = createHealthRoutes({
       getUptime: () => Math.floor((Date.now() - this.startTime) / 1000),
       getVersion: () => '1.0.0',
@@ -293,7 +302,7 @@ export class ServerEdition {
         { name: 'memory', check: async () => this.memoryStore !== null },
       ],
     })
-    this.application.app.route('/health', healthApp)
+    this.application.getHttpApp().route('/health', healthApp)
     console.log(
       `Health API mounted at http://127.0.0.1:${this.config.serverPort}/health`,
     )
@@ -310,12 +319,6 @@ export class ServerEdition {
     if (this.adaptiveOptimizer) {
       this.adaptiveOptimizer.stop()
       console.log('Adaptive optimizer stopped')
-    }
-
-    if (this.optimizerDb) {
-      this.optimizerDb.close()
-      this.optimizerDb = null
-      console.log('Optimizer database closed')
     }
 
     if (this.memoryStore) {
@@ -362,6 +365,10 @@ export class ServerEdition {
       await this.xvfb.stop()
       console.log('Xvfb stopped')
     }
+
+    // Close the shared database connection last
+    DatabaseProvider.close()
+    console.log('Database closed')
 
     console.log('Server Edition shutdown complete')
   }

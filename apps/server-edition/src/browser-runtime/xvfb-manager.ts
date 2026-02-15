@@ -73,20 +73,18 @@ export class XvfbManager {
 
     const proc = this.process
     return new Promise((resolve) => {
+      const killTimer = setTimeout(() => {
+        if (this.process && !this.process.killed) {
+          this.process.kill('SIGKILL')
+        }
+      }, 5000)
+
       proc.on('exit', () => {
+        clearTimeout(killTimer)
         this.process = null
         resolve()
       })
       proc.kill('SIGTERM')
-
-      // Force kill after 5s
-      setTimeout(() => {
-        if (this.process) {
-          this.process.kill('SIGKILL')
-          this.process = null
-          resolve()
-        }
-      }, 5000)
     })
   }
 

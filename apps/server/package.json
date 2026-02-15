@@ -39,6 +39,10 @@
     "./lib/clients/gateway": {
       "types": "./src/lib/clients/gateway.ts",
       "default": "./src/lib/clients/gateway.ts"
+    },
+    "./main": {
+      "types": "./src/main.ts",
+      "default": "./src/main.ts"
     }
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 
 export interface SessionData {
   conversationId: string
@@ -13,9 +13,8 @@ export class PersistentSessionManager {
   private db: Database
   private cache = new Map<string, SessionData>()
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -195,6 +194,6 @@ export class PersistentSessionManager {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 }

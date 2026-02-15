@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { LLMConfig } from '@browseros/shared/schemas/llm'
 import { type ProviderCredentials, ProviderPool } from './provider-pool'
 import { RouterMetrics } from './router-metrics'
@@ -11,7 +11,7 @@ import type {
 } from './types'
 
 export interface LLMRouterConfig {
-  dbPath: string
+  db: Database
   providers?: ProviderCredentials[]
   enableSelfLearning?: boolean
 }
@@ -25,8 +25,7 @@ export class LLMRouter {
   private selfLearner: SelfLearner | null = null
 
   constructor(config: LLMRouterConfig) {
-    this.db = new Database(config.dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+    this.db = config.db
 
     this.routingTable = new RoutingTable(this.db)
     this.providerPool = new ProviderPool()
@@ -108,9 +107,5 @@ export class LLMRouter {
 
   close(): void {
     this.stopSelfLearning()
-    if (this.selfLearner) {
-      this.selfLearner.stop()
-    }
-    this.db.close()
   }
 }

@@ -65,9 +65,13 @@ export class ChromiumLauncher {
 
     return new Promise((resolve, reject) => {
       this.process = spawn(execPath, args, {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'ignore', 'pipe'],
         env,
         detached: false,
+      })
+
+      this.process.stderr?.on('data', () => {
+        // Drain stderr to prevent buffer overflow
       })
 
       this.process.on('error', (err) => {
@@ -123,20 +127,20 @@ export class ChromiumLauncher {
   async stop(): Promise<void> {
     if (!this.process) return
 
+    const proc = this.process
     return new Promise((resolve) => {
-      this.process!.on('exit', () => {
+      const killTimer = setTimeout(() => {
+        if (proc && !proc.killed) {
+          proc.kill('SIGKILL')
+        }
+      }, 10000)
+
+      proc.on('exit', () => {
+        clearTimeout(killTimer)
         this.process = null
         resolve()
       })
-      this.process!.kill('SIGTERM')
-
-      setTimeout(() => {
-        if (this.process) {
-          this.process.kill('SIGKILL')
-          this.process = null
-          resolve()
-        }
-      }, 10000)
+      proc.kill('SIGTERM')
     })
   }
 
