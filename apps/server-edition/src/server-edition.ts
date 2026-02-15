@@ -255,6 +255,22 @@ export class ServerEdition {
 
   private applyMiddleware(): void {
     if (!this.application?.getHttpApp()) return
+
+    // Global error handler — catch unhandled exceptions
+    this.application.getHttpApp().onError((err: Error, c: any) => {
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          msg: 'Unhandled error',
+          error: err.message,
+          path: c.req.path,
+          method: c.req.method,
+          timestamp: new Date().toISOString(),
+        }),
+      )
+      return c.json({ error: 'Internal server error' }, 500)
+    })
+
     this.application.getHttpApp().use('*', createRequestLogger())
     if (this.config.auth.enabled) {
       this.application.getHttpApp().use(

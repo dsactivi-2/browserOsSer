@@ -52,7 +52,13 @@ export function createRouterRoutes(deps: RouterRoutesDeps) {
       return c.json({ error: 'No configuration available for tool' }, 404)
     }
 
-    return c.json(config)
+    // Strip credentials from response
+    const { apiKey, secretAccessKey, sessionToken, ...safeConfig } = config
+    return c.json({
+      ...safeConfig,
+      hasApiKey: !!apiKey,
+      hasSecretKey: !!secretAccessKey,
+    })
   })
 
   return app

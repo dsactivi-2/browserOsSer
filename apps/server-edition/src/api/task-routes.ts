@@ -24,10 +24,30 @@ export function createTaskRoutes(deps: TaskRoutesDeps) {
 
   // POST /tasks — Submit a single task
   app.post('/', async (c) => {
-    const raw = await c.req.json()
+    let raw: unknown
+    try {
+      raw = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
     const parsed = CreateTaskRequestSchema.safeParse(raw)
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
     const body = parsed.data
+
+    if (body.webhookUrl) {
+      try {
+        const parsedUrl = new URL(body.webhookUrl)
+        if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+          return c.json(
+            { error: 'webhookUrl must use http or https protocol' },
+            400,
+          )
+        }
+      } catch {
+        return c.json({ error: 'webhookUrl must be a valid URL' }, 400)
+      }
+    }
+
     const now = new Date().toISOString()
     const taskId = crypto.randomUUID()
 
@@ -60,10 +80,30 @@ export function createTaskRoutes(deps: TaskRoutesDeps) {
 
   // POST /tasks/batch — Submit a batch of tasks
   app.post('/batch', async (c) => {
-    const raw = await c.req.json()
+    let raw: unknown
+    try {
+      raw = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
     const parsed = CreateBatchRequestSchema.safeParse(raw)
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
     const body = parsed.data
+
+    if (body.webhookUrl) {
+      try {
+        const parsedUrl = new URL(body.webhookUrl)
+        if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+          return c.json(
+            { error: 'webhookUrl must use http or https protocol' },
+            400,
+          )
+        }
+      } catch {
+        return c.json({ error: 'webhookUrl must be a valid URL' }, 400)
+      }
+    }
+
     const now = new Date().toISOString()
     const batchId = crypto.randomUUID()
 

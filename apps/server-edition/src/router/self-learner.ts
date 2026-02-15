@@ -17,6 +17,7 @@ export class SelfLearner {
   private metrics: RouterMetrics
   private config: SelfLearnerConfig
   private timer: ReturnType<typeof setInterval> | null = null
+  private lastDowngradeCheckCalls = 0
 
   constructor(
     db: Database,
@@ -118,14 +119,19 @@ export class SelfLearner {
 
   private scheduleDowngradeTests(): void {
     const totalCalls = this.metrics.getTotalCalls()
-    if (totalCalls % this.config.downgradeTestInterval !== 0) return
+    if (
+      totalCalls - this.lastDowngradeCheckCalls <
+      this.config.downgradeTestInterval
+    )
+      return
+    this.lastDowngradeCheckCalls = totalCalls
 
     const pendingTests = this.db
       .prepare(
         "SELECT COUNT(*) as c FROM downgrade_tests WHERE status = 'pending'",
       )
-      .get() as any
-    if (pendingTests?.c > 3) return
+      .get() as { c: number } | null
+    if ((pendingTests?.c ?? 0) >= 3) return
 
     const candidates = this.metrics
       .getAggregated()

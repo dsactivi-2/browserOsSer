@@ -8,6 +8,15 @@ import type {
 } from '@browseros/shared/schemas/task'
 import type { StoredTask, TaskQueueStats } from './types'
 
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
 export class TaskStore {
   private db: Database
 
@@ -218,7 +227,7 @@ export class TaskStore {
     return {
       taskId,
       state: task.state,
-      result: resultRow?.result ? JSON.parse(resultRow.result) : undefined,
+      result: safeJsonParse(resultRow?.result, undefined),
       error: resultRow?.error ?? undefined,
       startedAt: resultRow?.started_at ?? undefined,
       completedAt: resultRow?.completed_at ?? undefined,
@@ -226,8 +235,8 @@ export class TaskStore {
       executionTimeMs: resultRow?.execution_time_ms ?? undefined,
       steps: stepRows.map((row) => ({
         tool: row.tool,
-        args: JSON.parse(row.args),
-        result: row.result ? JSON.parse(row.result) : undefined,
+        args: safeJsonParse(row.args, {}),
+        result: safeJsonParse(row.result, undefined),
         error: row.error ?? undefined,
         durationMs: row.duration_ms ?? undefined,
         timestamp: row.timestamp,
@@ -310,12 +319,12 @@ export class TaskStore {
       instruction: row.instruction,
       priority: row.priority,
       state: row.state,
-      dependsOn: JSON.parse(row.depends_on),
-      retryPolicy: row.retry_policy ? JSON.parse(row.retry_policy) : undefined,
+      dependsOn: safeJsonParse<string[]>(row.depends_on, []),
+      retryPolicy: safeJsonParse(row.retry_policy, undefined),
       timeout: row.timeout ?? undefined,
       webhookUrl: row.webhook_url ?? undefined,
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
-      llmConfig: row.llm_config ? JSON.parse(row.llm_config) : undefined,
+      metadata: safeJsonParse(row.metadata, undefined),
+      llmConfig: safeJsonParse(row.llm_config, undefined),
       batchId: row.batch_id ?? undefined,
       retryCount: row.retry_count,
       createdAt: row.created_at,

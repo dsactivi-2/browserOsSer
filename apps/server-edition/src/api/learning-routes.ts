@@ -125,8 +125,13 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
 
   // POST /learning/memory/analyze — Trigger memory self-analysis
   app.post('/memory/analyze', async (c) => {
-    const body = await c.req.json()
-    const { sessionId } = body
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
+    const { sessionId } = body as Record<string, unknown>
 
     if (!sessionId) {
       return c.json({ error: 'sessionId field required in request body' }, 400)
@@ -215,8 +220,13 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
 
   // POST /learning/knowledge — Store cross-session knowledge
   app.post('/knowledge', async (c) => {
-    const body = await c.req.json()
-    const { category, key, value, confidence } = body
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
+    const { category, key, value, confidence } = body as Record<string, unknown>
 
     if (!category || !key || !value) {
       return c.json({ error: 'category, key, and value fields required' }, 400)

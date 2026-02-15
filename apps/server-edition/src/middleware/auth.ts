@@ -7,8 +7,12 @@ export interface AuthConfig {
 }
 
 function timingSafeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+  const maxLen = Math.max(a.length, b.length)
+  const bufA = Buffer.alloc(maxLen)
+  const bufB = Buffer.alloc(maxLen)
+  bufA.write(a)
+  bufB.write(b)
+  return a.length === b.length && timingSafeEqual(bufA, bufB)
 }
 
 export function createAuthMiddleware(config: AuthConfig) {

@@ -15,8 +15,13 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
   app.get('/', (c) => c.json(connectorManager.listConnectors()))
 
   app.post('/', async (c) => {
-    const body = await c.req.json()
-    const { type, name, config } = body
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
+    const { type, name, config } = body as Record<string, unknown>
 
     if (!type || typeof type !== 'string') {
       return c.json({ error: 'type is required and must be a string' }, 400)
@@ -61,8 +66,13 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
 
   app.post('/:id/toggle', async (c) => {
     const id = c.req.param('id')
-    const body = await c.req.json()
-    const { enabled } = body
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON in request body' }, 400)
+    }
+    const { enabled } = body as Record<string, unknown>
 
     if (typeof enabled !== 'boolean') {
       return c.json({ error: 'enabled must be a boolean' }, 400)

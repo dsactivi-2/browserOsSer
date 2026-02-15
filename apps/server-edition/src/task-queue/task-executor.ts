@@ -66,7 +66,11 @@ export class TaskExecutor {
           state: 'completed',
           result,
           executionTimeMs,
-        }).catch(() => {})
+        }).catch((err) => {
+          console.warn(
+            `Webhook delivery failed for task ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        })
       }
     } catch (error) {
       const executionTimeMs = Date.now() - startTime
@@ -94,7 +98,11 @@ export class TaskExecutor {
           state: 'failed',
           error: errorMsg,
           executionTimeMs,
-        }).catch(() => {})
+        }).catch((err) => {
+          console.warn(
+            `Webhook delivery failed for task ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        })
       }
     } finally {
       clearTimeout(timeoutId)
@@ -179,10 +187,11 @@ export class TaskExecutor {
         hostname === '0.0.0.0' ||
         hostname === '::1' ||
         hostname.startsWith('10.') ||
-        hostname.startsWith('172.') ||
+        hostname.match(/^172\.(1[6-9]|2\d|3[0-1])\./) ||
         hostname.startsWith('192.168.') ||
         hostname === '169.254.169.254' ||
-        hostname.endsWith('.internal')
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.local')
       ) {
         return false
       }
