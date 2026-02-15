@@ -56,7 +56,7 @@ export class VectorDB {
     const BATCH_LIMIT = 1000
 
     let query = 'SELECT id, embedding, dimension FROM memory_vectors'
-    const params: unknown[] = []
+    const params: (string | number)[] = []
 
     if (sessionId) {
       query += ' WHERE session_id = ?'

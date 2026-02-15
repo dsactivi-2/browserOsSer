@@ -72,7 +72,7 @@ export class ReasoningBank {
 
   findSimilar(query: PatternQuery): PatternMatch[] {
     const conditions: string[] = ['success = 1']
-    const params: unknown[] = []
+    const params: (string | number)[] = []
 
     if (query.toolName) {
       conditions.push('tool_sequence LIKE ?')

@@ -113,7 +113,7 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       return c.json({ error: 'sessionId query parameter required' }, 400)
     }
 
-    const entries = memoryStore.getBySession(sessionId)
+    const entries = memoryStore.getBySession(String(sessionId))
     const totalTokens = entries.reduce((sum: number, e: MemoryEntry) => {
       const tokens = tokenBudgetManager.estimateTokens(e.content)
       return sum + tokens
@@ -137,7 +137,7 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       return c.json({ error: 'sessionId field required in request body' }, 400)
     }
 
-    const entries = memoryStore.getBySession(sessionId)
+    const entries = memoryStore.getBySession(String(sessionId))
     const totalTokens = entries.reduce((sum: number, e: MemoryEntry) => {
       return sum + tokenBudgetManager.estimateTokens(e.content)
     }, 0)
@@ -239,7 +239,7 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       'website_knowledge',
       'error_pattern',
     ]
-    if (!validCategories.includes(category)) {
+    if (!validCategories.includes(category as string)) {
       return c.json(
         {
           error: `Invalid category. Must be one of: ${validCategories.join(', ')}`,
@@ -248,7 +248,12 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
       )
     }
 
-    const id = crossSessionStore.store(category, key, value, confidence)
+    const id = crossSessionStore.store(
+      category as KnowledgeCategory,
+      String(key),
+      String(value),
+      typeof confidence === 'number' ? confidence : undefined,
+    )
     return c.json(
       {
         id,

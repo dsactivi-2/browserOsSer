@@ -42,7 +42,7 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
       const id = await connectorManager.addConnector(
         type as ConnectorType,
         name,
-        config ?? {},
+        (config ?? {}) as Record<string, unknown>,
       )
       return c.json({ id, type, name }, 201)
     } catch (err) {
