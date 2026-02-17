@@ -10,9 +10,7 @@ import { createHealthRoutes } from './api/health-routes'
 import { createLearningRoutes } from './api/learning-routes'
 import { createRouterRoutes } from './api/router-routes'
 import { createTaskRoutes } from './api/task-routes'
-import { ChromiumLauncher } from './browser-runtime/chromium-launcher'
-import { VncProxy } from './browser-runtime/vnc-proxy'
-import { XvfbManager } from './browser-runtime/xvfb-manager'
+import { BrowserRuntimeManager } from './browser-runtime/browser-runtime-manager'
 import type { ServerEditionConfig } from './config'
 import { ConnectorManager } from './connectors/connector-manager'
 import { RestConnector } from './connectors/rest/rest-connector'
@@ -26,9 +24,7 @@ import { TaskStore } from './task-queue/task-store'
 
 export class ServerEdition {
   private config: ServerEditionConfig
-  private xvfb: XvfbManager | null = null
-  private chromium: ChromiumLauncher | null = null
-  private vnc: VncProxy | null = null
+  private browserRuntime: BrowserRuntimeManager | null = null
   private application: any = null
   private taskStore: TaskStore | null = null
   private taskScheduler: TaskScheduler | null = null
@@ -53,19 +49,12 @@ export class ServerEdition {
     DatabaseProvider.create(this.config.dbPath)
     console.log(`Database initialized at ${this.config.dbPath} (WAL mode)`)
 
-    if (this.config.mode === 'server') {
-      await this.startXvfb()
-    }
-
-    await this.launchChromium()
+    this.browserRuntime = new BrowserRuntimeManager(this.config)
+    await this.browserRuntime.start()
     await this.startBrowserOSServer()
 
     // Apply middleware (before VNC and other routes)
     this.applyMiddleware()
-
-    if (this.config.mode === 'server' && this.config.vnc.enabled) {
-      await this.startVnc()
-    }
 
     this.logStartupSummary()
 
@@ -83,39 +72,6 @@ export class ServerEdition {
 
     // Step 9: Initialize health routes
     this.initializeHealth()
-  }
-
-  private async startXvfb(): Promise<void> {
-    console.log(`Starting Xvfb on display ${this.config.xvfb.display}...`)
-    this.xvfb = new XvfbManager({
-      display: this.config.xvfb.display,
-      resolution: this.config.xvfb.resolution,
-    })
-    await this.xvfb.start()
-    console.log(`Xvfb running on display ${this.config.xvfb.display}`)
-  }
-
-  private async launchChromium(): Promise<void> {
-    const extensionPath =
-      this.config.extensionPath ??
-      path.resolve(
-        process.cwd(),
-        this.config.chromium.extensionDir ?? 'apps/controller-ext/dist',
-      )
-
-    console.log(
-      `Launching Chromium (CDP port: ${this.config.chromium.cdpPort})...`,
-    )
-    this.chromium = new ChromiumLauncher({
-      executablePath: this.config.chromium.path,
-      cdpPort: this.config.chromium.cdpPort,
-      extensionPort: this.config.chromium.extensionPort,
-      display:
-        this.config.mode === 'server' ? this.config.xvfb.display : undefined,
-      extensionPath,
-    })
-    await this.chromium.launch()
-    console.log('Chromium launched and CDP available')
   }
 
   private async startBrowserOSServer(): Promise<void> {
@@ -140,20 +96,6 @@ export class ServerEdition {
 
     console.log(
       `BrowserOS server running on http://127.0.0.1:${this.config.serverPort}`,
-    )
-  }
-
-  private async startVnc(): Promise<void> {
-    console.log(`Starting VNC proxy on port ${this.config.vnc.port}...`)
-    this.vnc = new VncProxy({
-      enabled: true,
-      port: this.config.vnc.port,
-      password: this.config.vnc.password,
-      display: this.config.xvfb.display,
-    })
-    await this.vnc.start()
-    console.log(
-      `VNC available at http://localhost:${this.config.vnc.port}/vnc.html`,
     )
   }
 
@@ -312,7 +254,10 @@ export class ServerEdition {
       getUptime: () => Math.floor((Date.now() - this.startTime) / 1000),
       getVersion: () => '1.0.0',
       checks: [
-        { name: 'chromium', check: async () => this.chromium !== null },
+        {
+          name: 'chromium',
+          check: async () => this.browserRuntime?.isChromiumRunning() ?? false,
+        },
         { name: 'taskQueue', check: async () => this.taskStore !== null },
         { name: 'router', check: async () => this.llmRouter !== null },
         { name: 'memory', check: async () => this.memoryStore !== null },
@@ -367,19 +312,8 @@ export class ServerEdition {
       console.log('Task store closed')
     }
 
-    if (this.vnc) {
-      await this.vnc.stop()
-      console.log('VNC stopped')
-    }
-
-    if (this.chromium) {
-      await this.chromium.stop()
-      console.log('Chromium stopped')
-    }
-
-    if (this.xvfb) {
-      await this.xvfb.stop()
-      console.log('Xvfb stopped')
+    if (this.browserRuntime) {
+      await this.browserRuntime.stop()
     }
 
     // Close the shared database connection last
@@ -396,8 +330,8 @@ export class ServerEdition {
     console.log(`  API:    http://127.0.0.1:${this.config.serverPort}`)
     console.log(`  CDP:    ws://127.0.0.1:${this.config.chromium.cdpPort}`)
 
-    if (this.vnc?.isRunning()) {
-      console.log(`  VNC:    ${this.vnc.getUrl()}`)
+    if (this.browserRuntime?.isVncRunning()) {
+      console.log(`  VNC:    ${this.browserRuntime.getVncUrl()}`)
     }
 
     if (this.config.auth.enabled) {
