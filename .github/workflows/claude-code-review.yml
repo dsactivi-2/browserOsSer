@@ -34,43 +34,22 @@ jobs:
         id: review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY=$(echo '${{ github.event.pull_request.body }}' | head -c 2000)
-
+          PR_BODY_SHORT=$(echo "$PR_BODY" | head -c 2000)
           DIFF=$(cat /tmp/pr_diff.txt)
 
-          PROMPT=$(cat <<'PROMPT_EOF'
-          You are an expert code reviewer. Review the following pull request diff.
-
-          Focus on:
-          1. Bugs and logic errors
-          2. Security vulnerabilities (injection, XSS, secrets in code)
-          3. Performance issues
-          4. TypeScript type safety
-          5. Missing error handling
-
-          Be concise. Only flag real issues. Use this format:
-
-          ## Code Review Summary
-          [1-2 sentence summary]
-
-          ## Issues Found
-          - **[severity]** `file:line` — description
-
-          Severity levels: 🔴 Critical, 🟠 Warning, 🟡 Suggestion
-
-          If the code looks good, say so briefly.
-          PROMPT_EOF
+          PROMPT="You are an expert code reviewer. Review the following pull request diff. Focus on: 1. Bugs and logic errors 2. Security vulnerabilities (injection, XSS, secrets in code) 3. Performance issues 4. TypeScript type safety 5. Missing error handling. Be concise. Only flag real issues. Use this format: ## Code Review Summary [1-2 sentence summary] ## Issues Found - **[severity]** file:line — description. Severity levels: Critical, Warning, Suggestion. If the code looks good, say so briefly."
 
           REQUEST_BODY=$(jq -n \
             --arg prompt "$PROMPT" \
             --arg title "$PR_TITLE" \
-            --arg body "$PR_BODY" \
+            --arg body "$PR_BODY_SHORT" \
             --arg diff "$DIFF" \
             '{
               "contents": [{
-                "parts": [{"text": ($prompt + "\n\n## PR: " + $title + "\n" + $body + "\n\n## Diff:\n```\n" + $diff + "\n```")}]
+                "parts": [{"text": ($prompt + "\n\nPR: " + $title + "\n" + $body + "\n\nDiff:\n" + $diff)}]
               }],
               "generationConfig": {
                 "temperature": 0.2,
@@ -92,14 +71,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           REVIEW=$(cat /tmp/review.md)
-          COMMENT="🤖 **Gemini 2.5 Pro Code Review**
 
-          ${REVIEW}
-
-          ---
-          *Automated review by Google Gemini 2.5 Pro*"
+          {
+            echo "**Gemini 2.5 Pro Code Review**"
+            echo ""
+            echo "$REVIEW"
+            echo ""
+            echo "---"
+            echo "*Automated review by Google Gemini 2.5 Pro*"
+          } > /tmp/comment.md
 
           gh pr comment ${{ github.event.pull_request.number }} \
             --repo ${{ github.repository }} \
-            --body "$COMMENT"
-
+            --body-file /tmp/comment.md
