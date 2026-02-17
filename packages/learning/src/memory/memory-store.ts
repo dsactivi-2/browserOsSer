@@ -6,6 +6,31 @@ import type {
 } from './types'
 import { VectorDB } from './vector-db'
 
+interface MemoryEntryRow {
+  id: string
+  type: string
+  session_id: string
+  content: string
+  role: string
+  metadata: string
+  relevance_score: number
+  is_compressed: number
+  compressed_at: string | null
+  original_token_count: number | null
+  compressed_token_count: number | null
+  created_at: string
+  updated_at: string
+}
+
+interface CountRow {
+  c: number
+}
+
+interface TypeCountRow {
+  type: string
+  c: number
+}
+
 export class MemoryStore {
   private db: Database
   private vectorDb: VectorDB
@@ -72,7 +97,7 @@ export class MemoryStore {
   get(id: string): MemoryEntry | null {
     const row = this.db
       .prepare('SELECT * FROM memory_entries WHERE id = ?')
-      .get(id) as any
+      .get(id) as MemoryEntryRow | null
     if (!row) return null
     return this.rowToEntry(row)
   }
@@ -93,9 +118,9 @@ export class MemoryStore {
       query += ' LIMIT ?'
       params.push(limit)
     }
-    return (this.db.prepare(query).all(...(params as string[])) as any[]).map(
-      this.rowToEntry,
-    )
+    return (
+      this.db.prepare(query).all(...(params as string[])) as MemoryEntryRow[]
+    ).map(this.rowToEntry)
   }
 
   searchByVector(
@@ -161,7 +186,7 @@ export class MemoryStore {
       (
         this.db
           .prepare(`SELECT COUNT(*) as c FROM memory_entries ${where}`)
-          .get(...(params as string[])) as any
+          .get(...(params as string[])) as CountRow | null
       )?.c ?? 0
     const compressed =
       (
@@ -169,14 +194,14 @@ export class MemoryStore {
           .prepare(
             `SELECT COUNT(*) as c FROM memory_entries ${where} ${where ? 'AND' : 'WHERE'} is_compressed = 1`,
           )
-          .get(...(params as string[])) as any
+          .get(...(params as string[])) as CountRow | null
       )?.c ?? 0
 
     const typeRows = this.db
       .prepare(
         `SELECT type, COUNT(*) as c FROM memory_entries ${where} GROUP BY type`,
       )
-      .all(...(params as string[])) as any[]
+      .all(...(params as string[])) as TypeCountRow[]
     const byType: Record<string, number> = {}
     for (const row of typeRows) byType[row.type] = row.c
 
@@ -187,7 +212,7 @@ export class MemoryStore {
     // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 
-  private rowToEntry(row: any): MemoryEntry {
+  private rowToEntry(row: MemoryEntryRow): MemoryEntry {
     return {
       id: row.id,
       type: row.type,

@@ -1,12 +1,20 @@
 import { Hono } from 'hono'
-import type { ConnectorType } from '../connectors/connector-interface'
+import { z } from 'zod'
 import type { ConnectorManager } from '../connectors/connector-manager'
+
+const CreateConnectorSchema = z.object({
+  type: z.enum(['rest', 'webhook']),
+  name: z.string().min(1).max(100),
+  config: z.record(z.unknown()).optional().default({}),
+})
+
+const ToggleConnectorSchema = z.object({
+  enabled: z.boolean(),
+})
 
 export interface ConnectorRoutesDeps {
   connectorManager: ConnectorManager
 }
-
-const VALID_CONNECTOR_TYPES: ConnectorType[] = ['rest', 'webhook']
 
 export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
   const { connectorManager } = deps
@@ -21,29 +29,15 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
     } catch {
       return c.json({ error: 'Invalid JSON in request body' }, 400)
     }
-    const { type, name, config } = body as Record<string, unknown>
 
-    if (!type || typeof type !== 'string') {
-      return c.json({ error: 'type is required and must be a string' }, 400)
-    }
-    if (!VALID_CONNECTOR_TYPES.includes(type as ConnectorType)) {
-      return c.json(
-        {
-          error: `Invalid type. Must be one of: ${VALID_CONNECTOR_TYPES.join(', ')}`,
-        },
-        400,
-      )
-    }
-    if (!name || typeof name !== 'string' || name.length > 100) {
-      return c.json({ error: 'name is required (string, max 100 chars)' }, 400)
+    const parsed = CreateConnectorSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0].message }, 400)
     }
 
+    const { type, name, config } = parsed.data
     try {
-      const id = await connectorManager.addConnector(
-        type as ConnectorType,
-        name,
-        (config ?? {}) as Record<string, unknown>,
-      )
+      const id = await connectorManager.addConnector(type, name, config)
       return c.json({ id, type, name }, 201)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -72,14 +66,14 @@ export function createConnectorRoutes(deps: ConnectorRoutesDeps) {
     } catch {
       return c.json({ error: 'Invalid JSON in request body' }, 400)
     }
-    const { enabled } = body as Record<string, unknown>
 
-    if (typeof enabled !== 'boolean') {
-      return c.json({ error: 'enabled must be a boolean' }, 400)
+    const parsed = ToggleConnectorSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0].message }, 400)
     }
 
-    connectorManager.setEnabled(id, enabled)
-    return c.json({ id, enabled })
+    connectorManager.setEnabled(id, parsed.data.enabled)
+    return c.json({ id, enabled: parsed.data.enabled })
   })
 
   return app

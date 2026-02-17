@@ -4,6 +4,18 @@ import type { RouterMetrics } from './router-metrics'
 import type { RoutingTable } from './routing-table'
 import type { AggregatedMetrics } from './types'
 
+interface DowngradeTestRow {
+  id: number
+  tool_name: string
+  test_provider: string
+  test_model: string
+  sample_size: number
+  success_count: number
+  status: string
+  started_at: string
+  completed_at: string | null
+}
+
 export interface SelfLearnerConfig {
   optimizationInterval: number
   downgradeTestInterval: number
@@ -162,7 +174,7 @@ export class SelfLearner {
       .prepare(
         "SELECT * FROM downgrade_tests WHERE status = 'pending' AND sample_size >= ?",
       )
-      .all(this.config.downgradeTestSampleSize) as any[]
+      .all(this.config.downgradeTestSampleSize) as DowngradeTestRow[]
 
     for (const test of tests) {
       const successRate =
@@ -284,7 +296,7 @@ export class SelfLearner {
       .prepare(
         'SELECT * FROM routing_optimizations ORDER BY timestamp DESC LIMIT ?',
       )
-      .all(limit) as any[]
+      .all(limit) as Record<string, unknown>[]
   }
 
   private groupByTool(
