@@ -29,7 +29,6 @@ interface TypeCountRow {
   c: number
 }
 
-
 export class ReasoningBank {
   private db: Database
 
