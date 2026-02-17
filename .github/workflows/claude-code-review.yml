@@ -30,7 +30,7 @@ jobs:
             echo "trimmed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Review with Gemini 2.5 Flash
+      - name: Review with Gemini 2.5 Pro
         id: review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -79,7 +79,7 @@ jobs:
             }')
 
           RESPONSE=$(curl -s -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}" \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$REQUEST_BODY")
 
@@ -92,12 +92,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           REVIEW=$(cat /tmp/review.md)
-          COMMENT="🤖 **Gemini 2.5 Flash Code Review**
+          COMMENT="🤖 **Gemini 2.5 Pro Code Review**
 
           ${REVIEW}
 
           ---
-          *Automated review by Google Gemini 2.5 Flash*"
+          *Automated review by Google Gemini 2.5 Pro*"
 
           gh pr comment ${{ github.event.pull_request.number }} \
             --repo ${{ github.repository }} \
