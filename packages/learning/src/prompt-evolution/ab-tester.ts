@@ -1,12 +1,24 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { ABExperiment } from './types'
+
+interface ABExperimentRow {
+  id: string
+  template_name: string
+  variant_a_id: string
+  variant_b_id: string
+  traffic_split_percent: number
+  min_sample_size: number
+  status: string
+  winner_id: string | null
+  started_at: string
+  concluded_at: string | null
+}
 
 export class ABTester {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -86,14 +98,14 @@ export class ABTester {
       .prepare(
         "SELECT * FROM ab_experiments WHERE template_name = ? AND status = 'running' ORDER BY started_at DESC LIMIT 1",
       )
-      .get(templateName) as any
+      .get(templateName) as ABExperimentRow | null
     return row ? this.rowToExperiment(row) : null
   }
 
   get(id: string): ABExperiment | null {
     const row = this.db
       .prepare('SELECT * FROM ab_experiments WHERE id = ?')
-      .get(id) as any
+      .get(id) as ABExperimentRow | null
     return row ? this.rowToExperiment(row) : null
   }
 
@@ -104,7 +116,7 @@ export class ABTester {
           .prepare(
             'SELECT * FROM ab_experiments WHERE status = ? ORDER BY started_at DESC LIMIT ?',
           )
-          .all(status, limit) as any[]
+          .all(status, limit) as ABExperimentRow[]
       ).map(this.rowToExperiment)
     }
     return (
@@ -112,15 +124,15 @@ export class ABTester {
         .prepare(
           'SELECT * FROM ab_experiments ORDER BY started_at DESC LIMIT ?',
         )
-        .all(limit) as any[]
+        .all(limit) as ABExperimentRow[]
     ).map(this.rowToExperiment)
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider
   }
 
-  private rowToExperiment(row: any): ABExperiment {
+  private rowToExperiment(row: ABExperimentRow): ABExperiment {
     return {
       id: row.id,
       templateName: row.template_name,

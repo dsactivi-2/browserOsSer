@@ -127,7 +127,12 @@ export class ConnectorManager {
 
   async shutdownAll(): Promise<void> {
     for (const connector of this.connectors.values()) {
-      await connector.shutdown().catch(() => {})
+      await connector.shutdown().catch((err) => {
+        console.warn(
+          'Connector shutdown error:',
+          err instanceof Error ? err.message : err,
+        )
+      })
     }
     this.connectors.clear()
     // DB lifecycle managed by DatabaseProvider — nothing to close here

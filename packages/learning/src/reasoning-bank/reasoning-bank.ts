@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { ExecutionPattern, PatternMatch, PatternQuery } from './types'
 
 interface PatternRow {
@@ -16,12 +16,25 @@ interface PatternRow {
   created_at: string
 }
 
+interface CountRow {
+  c: number
+}
+
+interface AvgRow {
+  a: number
+}
+
+interface TypeCountRow {
+  task_type: string
+  c: number
+}
+
+
 export class ReasoningBank {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -153,9 +166,9 @@ export class ReasoningBank {
   } {
     const total =
       (
-        this.db.prepare('SELECT COUNT(*) as c FROM execution_patterns').get() as
-          | { c: number }
-          | undefined
+        this.db
+          .prepare('SELECT COUNT(*) as c FROM execution_patterns')
+          .get() as CountRow | null
       )?.c ?? 0
     const successful =
       (
@@ -163,19 +176,19 @@ export class ReasoningBank {
           .prepare(
             'SELECT COUNT(*) as c FROM execution_patterns WHERE success = 1',
           )
-          .get() as { c: number } | undefined
+          .get() as CountRow | null
       )?.c ?? 0
     const avg =
       (
         this.db
           .prepare('SELECT AVG(confidence) as a FROM execution_patterns')
-          .get() as { a: number } | undefined
+          .get() as AvgRow | null
       )?.a ?? 0
     const types = this.db
       .prepare(
         'SELECT task_type, COUNT(*) as c FROM execution_patterns GROUP BY task_type',
       )
-      .all() as Array<{ task_type: string; c: number }>
+      .all() as TypeCountRow[]
     const byType: Record<string, number> = {}
     for (const t of types) byType[t.task_type] = t.c
     return {
@@ -187,7 +200,7 @@ export class ReasoningBank {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider
   }
 
   private rowToPattern(row: PatternRow): ExecutionPattern {
