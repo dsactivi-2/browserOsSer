@@ -1,44 +1,105 @@
-name: Claude Code Review
+name: Gemini Code Review
 
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
 
 jobs:
-  claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
+  gemini-review:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
-      id-token: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+      - name: Get PR diff
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} > /tmp/pr_diff.txt
+          DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
+          if [ "$DIFF_SIZE" -gt 100000 ]; then
+            head -c 100000 /tmp/pr_diff.txt > /tmp/pr_diff_trimmed.txt
+            mv /tmp/pr_diff_trimmed.txt /tmp/pr_diff.txt
+            echo "trimmed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Review with Gemini 2.5 Flash
+        id: review
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY=$(echo '${{ github.event.pull_request.body }}' | head -c 2000)
+
+          DIFF=$(cat /tmp/pr_diff.txt)
+
+          PROMPT=$(cat <<'PROMPT_EOF'
+          You are an expert code reviewer. Review the following pull request diff.
+
+          Focus on:
+          1. Bugs and logic errors
+          2. Security vulnerabilities (injection, XSS, secrets in code)
+          3. Performance issues
+          4. TypeScript type safety
+          5. Missing error handling
+
+          Be concise. Only flag real issues. Use this format:
+
+          ## Code Review Summary
+          [1-2 sentence summary]
+
+          ## Issues Found
+          - **[severity]** `file:line` — description
+
+          Severity levels: 🔴 Critical, 🟠 Warning, 🟡 Suggestion
+
+          If the code looks good, say so briefly.
+          PROMPT_EOF
+
+          REQUEST_BODY=$(jq -n \
+            --arg prompt "$PROMPT" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg diff "$DIFF" \
+            '{
+              "contents": [{
+                "parts": [{"text": ($prompt + "\n\n## PR: " + $title + "\n" + $body + "\n\n## Diff:\n```\n" + $diff + "\n```")}]
+              }],
+              "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 4096
+              }
+            }')
+
+          RESPONSE=$(curl -s -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY")
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Review could not be generated."')
+
+          echo "$REVIEW" > /tmp/review.md
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REVIEW=$(cat /tmp/review.md)
+          COMMENT="🤖 **Gemini 2.5 Flash Code Review**
+
+          ${REVIEW}
+
+          ---
+          *Automated review by Google Gemini 2.5 Flash*"
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --body "$COMMENT"
 
