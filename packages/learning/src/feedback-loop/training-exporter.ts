@@ -1,11 +1,21 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { TrainingPair } from './types'
+
+interface TrainingRow {
+  task_id: string
+  rating: string
+  tools_used: string
+  duration_ms: number
+  input_summary: string | null
+  output_summary: string | null
+  tool_sequence: string | null
+}
 
 export class TrainingExporter {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
+  constructor(db: Database) {
+    this.db = db
   }
 
   exportTrainingPairs(
@@ -28,7 +38,7 @@ export class TrainingExporter {
       ORDER BY f.created_at DESC
       LIMIT ?
     `)
-      .all(limit) as any[]
+      .all(limit) as TrainingRow[]
 
     return rows
       .filter((r) => r.input_summary && r.output_summary)
@@ -51,6 +61,6 @@ export class TrainingExporter {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider
   }
 }

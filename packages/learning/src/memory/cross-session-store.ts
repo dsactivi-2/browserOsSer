@@ -19,6 +19,31 @@ export interface CrossSessionEntry {
   updatedAt: string
 }
 
+interface CrossSessionRow {
+  id: string
+  category: string
+  key: string
+  value: string
+  confidence: number
+  usage_count: number
+  last_used_at: string
+  created_at: string
+  updated_at: string
+}
+
+interface CountRow {
+  c: number
+}
+
+interface CategoryCountRow {
+  category: string
+  c: number
+}
+
+interface AvgRow {
+  avg: number
+}
+
 export class CrossSessionStore {
   private db: Database
 
@@ -80,7 +105,7 @@ export class CrossSessionStore {
       .prepare(
         'SELECT * FROM cross_session_knowledge WHERE category = ? AND key = ?',
       )
-      .get(category, key) as any
+      .get(category, key) as CrossSessionRow | null
     if (!row) return null
     return this.rowToEntry(row)
   }
@@ -95,7 +120,7 @@ export class CrossSessionStore {
         .prepare(
           'SELECT * FROM cross_session_knowledge WHERE category = ? ORDER BY confidence DESC, usage_count DESC LIMIT ?',
         )
-        .all(category, limit) as any[]
+        .all(category, limit) as CrossSessionRow[]
     ).map(this.rowToEntry)
   }
 
@@ -112,7 +137,7 @@ export class CrossSessionStore {
           .prepare(
             'SELECT * FROM cross_session_knowledge WHERE category = ? AND (key LIKE ? OR value LIKE ?) ORDER BY confidence DESC LIMIT ?',
           )
-          .all(category, pattern, pattern, limit) as any[]
+          .all(category, pattern, pattern, limit) as CrossSessionRow[]
       ).map(this.rowToEntry)
     }
     return (
@@ -120,7 +145,7 @@ export class CrossSessionStore {
         .prepare(
           'SELECT * FROM cross_session_knowledge WHERE key LIKE ? OR value LIKE ? ORDER BY confidence DESC LIMIT ?',
         )
-        .all(pattern, pattern, limit) as any[]
+        .all(pattern, pattern, limit) as CrossSessionRow[]
     ).map(this.rowToEntry)
   }
 
@@ -162,20 +187,20 @@ export class CrossSessionStore {
       (
         this.db
           .prepare('SELECT COUNT(*) as c FROM cross_session_knowledge')
-          .get() as any
+          .get() as CountRow | null
       )?.c ?? 0
     const catRows = this.db
       .prepare(
         'SELECT category, COUNT(*) as c FROM cross_session_knowledge GROUP BY category',
       )
-      .all() as any[]
+      .all() as CategoryCountRow[]
     const byCategory: Record<string, number> = {}
     for (const row of catRows) byCategory[row.category] = row.c
     const avg =
       (
         this.db
           .prepare('SELECT AVG(confidence) as avg FROM cross_session_knowledge')
-          .get() as any
+          .get() as AvgRow | null
       )?.avg ?? 0
     return { total, byCategory, avgConfidence: Math.round(avg * 100) / 100 }
   }
@@ -184,7 +209,7 @@ export class CrossSessionStore {
     // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 
-  private rowToEntry(row: any): CrossSessionEntry {
+  private rowToEntry(row: CrossSessionRow): CrossSessionEntry {
     return {
       id: row.id,
       category: row.category,

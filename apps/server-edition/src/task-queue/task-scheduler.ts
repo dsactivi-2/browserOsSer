@@ -57,7 +57,12 @@ export class TaskScheduler {
       this.pollTimer = null
     }
     if (this.pollPromise) {
-      await this.pollPromise.catch(() => {})
+      await this.pollPromise.catch((err) => {
+        console.warn(
+          'Poll promise error during shutdown:',
+          err instanceof Error ? err.message : err,
+        )
+      })
     }
   }
 

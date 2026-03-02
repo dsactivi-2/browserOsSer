@@ -1,12 +1,27 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { PromptVariant } from './types'
+
+interface PromptVariantRow {
+  id: string
+  template_name: string
+  version: number
+  content: string
+  is_active: number
+  is_winner: number
+  success_rate: number
+  total_uses: number
+  success_count: number
+  failure_count: number
+  avg_latency_ms: number
+  created_at: string
+  promoted_at: string | null
+}
 
 export class PromptRegistry {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -53,21 +68,21 @@ export class PromptRegistry {
       .prepare(
         'SELECT * FROM prompt_variants WHERE template_name = ? AND is_winner = 1 AND is_active = 1',
       )
-      .get(templateName) as any
+      .get(templateName) as PromptVariantRow | null
     if (winner) return this.rowToVariant(winner)
 
     const latest = this.db
       .prepare(
         'SELECT * FROM prompt_variants WHERE template_name = ? AND is_active = 1 ORDER BY version DESC LIMIT 1',
       )
-      .get(templateName) as any
+      .get(templateName) as PromptVariantRow | null
     return latest ? this.rowToVariant(latest) : null
   }
 
   get(id: string): PromptVariant | null {
     const row = this.db
       .prepare('SELECT * FROM prompt_variants WHERE id = ?')
-      .get(id) as any
+      .get(id) as PromptVariantRow | null
     return row ? this.rowToVariant(row) : null
   }
 
@@ -112,7 +127,7 @@ export class PromptRegistry {
         .prepare(
           'SELECT * FROM prompt_variants WHERE template_name = ? ORDER BY version DESC',
         )
-        .all(templateName) as any[]
+        .all(templateName) as PromptVariantRow[]
     ).map(this.rowToVariant)
   }
 
@@ -121,12 +136,12 @@ export class PromptRegistry {
       .prepare(
         'SELECT DISTINCT template_name FROM prompt_variants ORDER BY template_name',
       )
-      .all() as any[]
+      .all() as { template_name: string }[]
     return rows.map((r) => r.template_name)
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider
   }
 
   private getNextVersion(templateName: string): number {
@@ -134,11 +149,11 @@ export class PromptRegistry {
       .prepare(
         'SELECT MAX(version) as max_v FROM prompt_variants WHERE template_name = ?',
       )
-      .get(templateName) as any
+      .get(templateName) as { max_v: number | null } | null
     return (row?.max_v ?? 0) + 1
   }
 
-  private rowToVariant(row: any): PromptVariant {
+  private rowToVariant(row: PromptVariantRow): PromptVariant {
     return {
       id: row.id,
       templateName: row.template_name,

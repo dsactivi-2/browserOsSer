@@ -9,6 +9,31 @@ export interface SessionData {
   messageCount: number
 }
 
+interface SessionRow {
+  conversation_id: string
+  metadata: string
+  created_at: string
+  updated_at: string
+  message_count: number
+}
+
+interface MessageRow {
+  role: string
+  content: string
+  timestamp: string
+}
+
+interface SessionListRow {
+  conversation_id: string
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
+interface CountRow {
+  c: number
+}
+
 export class PersistentSessionManager {
   private db: Database
   private cache = new Map<string, SessionData>()
@@ -51,14 +76,14 @@ export class PersistentSessionManager {
 
     const row = this.db
       .prepare('SELECT * FROM sessions WHERE conversation_id = ?')
-      .get(conversationId) as any
+      .get(conversationId) as SessionRow | null
 
     if (row) {
       const messages = this.db
         .prepare(
           'SELECT role, content, timestamp FROM session_messages WHERE conversation_id = ? ORDER BY id ASC',
         )
-        .all(conversationId) as any[]
+        .all(conversationId) as MessageRow[]
 
       const data: SessionData = {
         conversationId: row.conversation_id,
@@ -131,14 +156,14 @@ export class PersistentSessionManager {
         'SELECT role, content, timestamp FROM session_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?',
       )
       .all(conversationId, limit)
-      .reverse() as any[]
+      .reverse() as MessageRow[]
   }
 
   // Get full message count
   getMessageCount(conversationId: string): number {
     const row = this.db
       .prepare('SELECT message_count FROM sessions WHERE conversation_id = ?')
-      .get(conversationId) as any
+      .get(conversationId) as { message_count: number } | null
     return row?.message_count ?? 0
   }
 
@@ -183,13 +208,13 @@ export class PersistentSessionManager {
       .prepare(
         'SELECT conversation_id, message_count, created_at, updated_at FROM sessions ORDER BY updated_at DESC LIMIT ?',
       )
-      .all(limit) as any[]
+      .all(limit) as SessionListRow[]
   }
 
   count(): number {
     const row = this.db
       .prepare('SELECT COUNT(*) as c FROM sessions')
-      .get() as any
+      .get() as CountRow | null
     return row?.c ?? 0
   }
 

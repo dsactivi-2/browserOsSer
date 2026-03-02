@@ -1,12 +1,32 @@
-import { Database } from 'bun:sqlite'
+import type { Database } from 'bun:sqlite'
 import type { FeedbackStats, TaskFeedback } from './types'
+
+interface FeedbackRow {
+  id: string
+  task_id: string
+  pattern_id: string | null
+  rating: string
+  auto_rating: number
+  user_feedback: string | null
+  duration_ms: number
+  tools_used: string
+  retry_count: number
+  created_at: string
+}
+
+interface CountRow {
+  c: number
+}
+
+interface AvgRow {
+  a: number
+}
 
 export class FeedbackCollector {
   private db: Database
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath, { create: true })
-    this.db.exec('PRAGMA journal_mode = WAL')
+  constructor(db: Database) {
+    this.db = db
     this.initialize()
   }
 
@@ -84,7 +104,7 @@ export class FeedbackCollector {
         .prepare(
           'SELECT * FROM task_feedback WHERE task_id = ? ORDER BY created_at DESC',
         )
-        .all(taskId) as any[]
+        .all(taskId) as FeedbackRow[]
     ).map(this.rowToFeedback)
   }
 
@@ -95,27 +115,30 @@ export class FeedbackCollector {
           .prepare(
             'SELECT * FROM task_feedback WHERE rating = ? ORDER BY created_at DESC LIMIT ?',
           )
-          .all(rating, limit) as any[]
+          .all(rating, limit) as FeedbackRow[]
       ).map(this.rowToFeedback)
     }
     return (
       this.db
         .prepare('SELECT * FROM task_feedback ORDER BY created_at DESC LIMIT ?')
-        .all(limit) as any[]
+        .all(limit) as FeedbackRow[]
     ).map(this.rowToFeedback)
   }
 
   getStats(): FeedbackStats {
     const total =
-      (this.db.prepare('SELECT COUNT(*) as c FROM task_feedback').get() as any)
-        ?.c ?? 0
+      (
+        this.db
+          .prepare('SELECT COUNT(*) as c FROM task_feedback')
+          .get() as CountRow | null
+      )?.c ?? 0
     const success =
       (
         this.db
           .prepare(
             "SELECT COUNT(*) as c FROM task_feedback WHERE rating = 'success'",
           )
-          .get() as any
+          .get() as CountRow | null
       )?.c ?? 0
     const partial =
       (
@@ -123,7 +146,7 @@ export class FeedbackCollector {
           .prepare(
             "SELECT COUNT(*) as c FROM task_feedback WHERE rating = 'partial'",
           )
-          .get() as any
+          .get() as CountRow | null
       )?.c ?? 0
     const failure =
       (
@@ -131,13 +154,13 @@ export class FeedbackCollector {
           .prepare(
             "SELECT COUNT(*) as c FROM task_feedback WHERE rating = 'failure'",
           )
-          .get() as any
+          .get() as CountRow | null
       )?.c ?? 0
     const avgDuration =
       (
         this.db
           .prepare('SELECT AVG(duration_ms) as a FROM task_feedback')
-          .get() as any
+          .get() as AvgRow | null
       )?.a ?? 0
     const autoRated =
       (
@@ -145,7 +168,7 @@ export class FeedbackCollector {
           .prepare(
             'SELECT COUNT(*) as c FROM task_feedback WHERE auto_rating = 1',
           )
-          .get() as any
+          .get() as CountRow | null
       )?.c ?? 0
 
     return {
@@ -159,10 +182,10 @@ export class FeedbackCollector {
   }
 
   close(): void {
-    this.db.close()
+    // DB lifecycle managed by DatabaseProvider
   }
 
-  private rowToFeedback(row: any): TaskFeedback {
+  private rowToFeedback(row: FeedbackRow): TaskFeedback {
     return {
       id: row.id,
       taskId: row.task_id,

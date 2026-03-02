@@ -6,6 +6,14 @@ interface CacheEntry {
   norm: number
 }
 
+interface VectorRow {
+  id: string
+  embedding: Buffer
+  dimension: number
+  session_id: string | null
+  created_at: string
+}
+
 export class VectorDB {
   private db: Database
   private cache: Map<string, CacheEntry>
@@ -66,11 +74,7 @@ export class VectorDB {
     query += ' ORDER BY created_at DESC LIMIT ?'
     params.push(BATCH_LIMIT)
 
-    const rows = this.db.prepare(query).all(...params) as Array<{
-      id: string
-      embedding: Buffer
-      dimension: number
-    }>
+    const rows = this.db.prepare(query).all(...params) as VectorRow[]
 
     const results: Array<{ id: string; similarity: number }> = []
     const queryVec = new Float32Array(queryEmbedding)
@@ -109,7 +113,7 @@ export class VectorDB {
   count(): number {
     const row = this.db
       .prepare('SELECT COUNT(*) as count FROM memory_vectors')
-      .get() as { count: number } | undefined
+      .get() as { count: number } | null
     return row?.count ?? 0
   }
 

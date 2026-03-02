@@ -8,6 +8,43 @@ import type {
 } from '@browseros/shared/schemas/task'
 import type { StoredTask, TaskQueueStats } from './types'
 
+interface TaskRow {
+  id: string
+  instruction: string
+  priority: string
+  state: string
+  depends_on: string
+  retry_policy: string | null
+  timeout: number | null
+  webhook_url: string | null
+  metadata: string | null
+  llm_config: string | null
+  batch_id: string | null
+  retry_count: number
+  created_at: string
+  updated_at: string
+}
+
+interface TaskResultRow {
+  task_id: string
+  result: string | null
+  error: string | null
+  started_at: string | null
+  completed_at: string | null
+  execution_time_ms: number | null
+}
+
+interface TaskStepRow {
+  id: number
+  task_id: string
+  tool: string
+  args: string
+  result: string | null
+  error: string | null
+  duration_ms: number | null
+  timestamp: string
+}
+
 function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback
   try {
@@ -94,7 +131,7 @@ export class TaskStore {
       task.webhookUrl ?? null,
       task.metadata ? JSON.stringify(task.metadata) : null,
       task.llmConfig ? JSON.stringify(task.llmConfig) : null,
-      (task as any).batchId ?? null,
+      task.batchId ?? null,
       task.createdAt,
       task.updatedAt,
     )
@@ -103,7 +140,7 @@ export class TaskStore {
   getTask(taskId: string): StoredTask | null {
     const row = this.db
       .prepare('SELECT * FROM tasks WHERE id = ?')
-      .get(taskId) as any
+      .get(taskId) as TaskRow | null
     if (!row) return null
     return this.rowToTask(row)
   }
@@ -141,7 +178,7 @@ export class TaskStore {
       .prepare(
         `SELECT * FROM tasks ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       )
-      .all(...(allParams as string[])) as any[]
+      .all(...(allParams as string[])) as TaskRow[]
 
     return rows.map((row) => this.rowToTask(row))
   }
@@ -161,7 +198,7 @@ export class TaskStore {
 
     const row = this.db
       .prepare('SELECT retry_count FROM tasks WHERE id = ?')
-      .get(taskId) as any
+      .get(taskId) as { retry_count: number } | null
     return row?.retry_count ?? 0
   }
 
@@ -219,10 +256,10 @@ export class TaskStore {
 
     const resultRow = this.db
       .prepare('SELECT * FROM task_results WHERE task_id = ?')
-      .get(taskId) as any
+      .get(taskId) as TaskResultRow | null
     const stepRows = this.db
       .prepare('SELECT * FROM task_steps WHERE task_id = ? ORDER BY id')
-      .all(taskId) as any[]
+      .all(taskId) as TaskStepRow[]
 
     return {
       taskId,
@@ -280,7 +317,7 @@ export class TaskStore {
       ORDER BY ${priorityOrder}, created_at ASC
       LIMIT ?
     `)
-      .all(limit) as any[]
+      .all(limit) as TaskRow[]
 
     return rows.map((row) => this.rowToTask(row))
   }
@@ -313,7 +350,7 @@ export class TaskStore {
     // DB lifecycle managed by DatabaseProvider — nothing to close here
   }
 
-  private rowToTask(row: any): StoredTask {
+  private rowToTask(row: TaskRow): StoredTask {
     return {
       id: row.id,
       instruction: row.instruction,

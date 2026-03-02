@@ -2,6 +2,19 @@ import type { Database } from 'bun:sqlite'
 import type { LLMProvider } from '@browseros/shared/schemas/llm'
 import type { AggregatedMetrics, RouterMetricEntry } from './types'
 
+interface MetricsAggregatedRow {
+  tool_name: string
+  provider: string
+  model: string
+  total_calls: number
+  success_count: number
+  failure_count: number
+  success_rate: number
+  avg_latency_ms: number
+  total_cost: number
+  last_used: string
+}
+
 export class RouterMetrics {
   private db: Database
 
@@ -79,7 +92,7 @@ export class RouterMetrics {
       GROUP BY tool_name, provider, model
       ORDER BY tool_name, success_rate DESC
     `)
-      .all(...(params as string[])) as any[]
+      .all(...(params as string[])) as MetricsAggregatedRow[]
 
     return rows.map((row) => ({
       toolName: row.tool_name,
@@ -98,7 +111,7 @@ export class RouterMetrics {
   getTotalCalls(): number {
     const row = this.db
       .prepare('SELECT COUNT(*) as count FROM router_metrics')
-      .get() as any
+      .get() as { count: number } | null
     return row?.count ?? 0
   }
 

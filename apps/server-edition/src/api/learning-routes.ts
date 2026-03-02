@@ -14,6 +14,24 @@ import type { MemoryStore } from '@browseros/learning/memory/memory-store'
 import type { PersistentSessionManager } from '@browseros/learning/memory/persistent-session'
 import type { TokenBudgetManager } from '@browseros/learning/memory/token-budget-manager'
 import { Hono } from 'hono'
+import { z } from 'zod'
+
+const AnalyzeMemorySchema = z.object({
+  sessionId: z.string().min(1),
+})
+
+const StoreKnowledgeSchema = z.object({
+  category: z.enum([
+    'domain',
+    'execution_pattern',
+    'user_preference',
+    'website_knowledge',
+    'error_pattern',
+  ]),
+  key: z.string().min(1),
+  value: z.string().min(1),
+  confidence: z.number().min(0).max(1).optional(),
+})
 
 interface MemoryEntry {
   id: string
@@ -131,13 +149,14 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
     } catch {
       return c.json({ error: 'Invalid JSON in request body' }, 400)
     }
-    const { sessionId } = body as Record<string, unknown>
 
-    if (!sessionId) {
-      return c.json({ error: 'sessionId field required in request body' }, 400)
+    const parsed = AnalyzeMemorySchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0].message }, 400)
     }
 
-    const entries = memoryStore.getBySession(String(sessionId))
+    const { sessionId } = parsed.data
+    const entries = memoryStore.getBySession(sessionId)
     const totalTokens = entries.reduce((sum: number, e: MemoryEntry) => {
       return sum + tokenBudgetManager.estimateTokens(e.content)
     }, 0)
@@ -226,43 +245,15 @@ export function createLearningRoutes(deps: LearningRoutesDeps) {
     } catch {
       return c.json({ error: 'Invalid JSON in request body' }, 400)
     }
-    const { category, key, value, confidence } = body as Record<string, unknown>
 
-    if (!category || !key || !value) {
-      return c.json({ error: 'category, key, and value fields required' }, 400)
+    const parsed = StoreKnowledgeSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0].message }, 400)
     }
 
-    const validCategories = [
-      'domain',
-      'execution_pattern',
-      'user_preference',
-      'website_knowledge',
-      'error_pattern',
-    ]
-    if (!validCategories.includes(category as string)) {
-      return c.json(
-        {
-          error: `Invalid category. Must be one of: ${validCategories.join(', ')}`,
-        },
-        400,
-      )
-    }
-
-    const id = crossSessionStore.store(
-      category as KnowledgeCategory,
-      String(key),
-      String(value),
-      typeof confidence === 'number' ? confidence : undefined,
-    )
-    return c.json(
-      {
-        id,
-        category,
-        key,
-        stored: true,
-      },
-      201,
-    )
+    const { category, key, value, confidence } = parsed.data
+    const id = crossSessionStore.store(category, key, value, confidence)
+    return c.json({ id, category, key, stored: true }, 201)
   })
 
   // GET /learning/optimizer/status — Current adaptive parameters and efficiency
