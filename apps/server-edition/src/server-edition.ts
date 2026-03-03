@@ -5,11 +5,23 @@ import { MemoryAnalyzer } from '@browseros/learning/memory/memory-analyzer'
 import { MemoryStore } from '@browseros/learning/memory/memory-store'
 import { PersistentSessionManager } from '@browseros/learning/memory/persistent-session'
 import { TokenBudgetManager } from '@browseros/learning/memory/token-budget-manager'
+import { createAdminRoutes } from './api/admin-routes'
+import { createApiKeyRoutes } from './api/api-key-routes'
+import { createAuditRoutes } from './api/audit-routes'
 import { createConnectorRoutes } from './api/connector-routes'
 import { createHealthRoutes } from './api/health-routes'
 import { createLearningRoutes } from './api/learning-routes'
+import { createMetricsRoutes } from './api/metrics-routes'
+import { createNotificationRoutes } from './api/notification-routes'
+import { createPreferencesRoutes } from './api/preferences-routes'
 import { createRouterRoutes } from './api/router-routes'
+import { createScannerRoutes } from './api/scanner-routes'
 import { createTaskRoutes } from './api/task-routes'
+import { createTemplateRoutes } from './api/template-routes'
+import { createTimelineRoutes } from './api/timeline-routes'
+import { createTrainingRoutes } from './api/training-routes'
+import { AuditStore } from './audit/audit-store'
+import { ApiKeyStore } from './auth/api-key-store'
 import { ChromiumLauncher } from './browser-runtime/chromium-launcher'
 import { VncProxy } from './browser-runtime/vnc-proxy'
 import { XvfbManager } from './browser-runtime/xvfb-manager'
@@ -20,9 +32,13 @@ import { WebhookConnector } from './connectors/webhook/webhook-connector'
 import { DatabaseProvider } from './database'
 import { createAuthMiddleware } from './middleware/auth'
 import { createRequestLogger } from './middleware/request-logger'
+import { NotificationManager } from './notifications/notification-manager'
 import { LLMRouter } from './router/llm-router'
+import { DependencyScanner } from './scanner/dependency-scanner'
 import { TaskScheduler } from './task-queue/task-scheduler'
 import { TaskStore } from './task-queue/task-store'
+import { TaskTemplateStore } from './task-queue/task-template-store'
+import { AutoTrainer } from './training/auto-trainer'
 
 export class ServerEdition {
   private config: ServerEditionConfig
@@ -40,6 +56,12 @@ export class ServerEdition {
   private memoryAnalyzer: MemoryAnalyzer | null = null
   private adaptiveOptimizer: AdaptiveTokenOptimizer | null = null
   private connectorManager: ConnectorManager | null = null
+  private auditStore: AuditStore | null = null
+  private apiKeyStore: ApiKeyStore | null = null
+  private notificationManager: NotificationManager | null = null
+  private taskTemplateStore: TaskTemplateStore | null = null
+  private autoTrainer: AutoTrainer | null = null
+  private dependencyScanner: DependencyScanner | null = null
   private startTime = Date.now()
 
   constructor(config: ServerEditionConfig) {
@@ -81,7 +103,10 @@ export class ServerEdition {
     // Step 8: Initialize connectors
     await this.initializeConnectors()
 
-    // Step 9: Initialize health routes
+    // Step 9: Initialize dashboard features
+    this.initializeDashboard()
+
+    // Step 10: Initialize health routes
     this.initializeHealth()
   }
 
@@ -306,6 +331,58 @@ export class ServerEdition {
     console.log('Connector system initialized')
   }
 
+  private initializeDashboard(): void {
+    const db = DatabaseProvider.get()!
+    const httpApp = this.application?.getHttpApp()
+    if (!httpApp) return
+
+    console.log('Initializing dashboard features...')
+    const getUptime = () => Math.floor((Date.now() - this.startTime) / 1000)
+
+    this.auditStore = new AuditStore(db)
+    this.apiKeyStore = new ApiKeyStore(db)
+    this.notificationManager = new NotificationManager(db)
+    this.taskTemplateStore = new TaskTemplateStore(db)
+    this.autoTrainer = new AutoTrainer(db)
+    this.dependencyScanner = new DependencyScanner(db)
+
+    this.auditStore.log({ action: 'system.started', actor: 'system' })
+    this.autoTrainer.startAutoTraining()
+
+    httpApp.route('/metrics', createMetricsRoutes({ db, getUptime }))
+    httpApp.route('/audit', createAuditRoutes({ auditStore: this.auditStore }))
+    httpApp.route(
+      '/api-keys',
+      createApiKeyRoutes({ apiKeyStore: this.apiKeyStore }),
+    )
+    httpApp.route(
+      '/notifications',
+      createNotificationRoutes(this.notificationManager),
+    )
+    httpApp.route(
+      '/templates',
+      createTemplateRoutes({ templateStore: this.taskTemplateStore }),
+    )
+    httpApp.route('/timeline', createTimelineRoutes({ db }))
+    httpApp.route(
+      '/training',
+      createTrainingRoutes({ autoTrainer: this.autoTrainer }),
+    )
+    httpApp.route(
+      '/scanner',
+      createScannerRoutes({ dependencyScanner: this.dependencyScanner }),
+    )
+    httpApp.route('/preferences', createPreferencesRoutes({ db }))
+    httpApp.route(
+      '/admin',
+      createAdminRoutes({ db, getUptime, dbPath: this.config.dbPath }),
+    )
+
+    console.log(
+      'Dashboard features initialized (metrics, audit, api-keys, notifications, templates, timeline, training, scanner, preferences, admin)',
+    )
+  }
+
   private initializeHealth(): void {
     if (!this.application?.getHttpApp()) return
     const healthApp = createHealthRoutes({
@@ -326,6 +403,15 @@ export class ServerEdition {
 
   async stop(): Promise<void> {
     console.log('Shutting down Server Edition...')
+
+    if (this.autoTrainer) {
+      this.autoTrainer.stopAutoTraining()
+      console.log('Auto-trainer stopped')
+    }
+
+    if (this.auditStore) {
+      this.auditStore.log({ action: 'system.stopped', actor: 'system' })
+    }
 
     if (this.connectorManager) {
       await this.connectorManager.shutdownAll()

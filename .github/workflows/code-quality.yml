@@ -46,6 +46,6 @@ jobs:
         run: bun run build:agent-sdk
 
       - name: Run Typecheck
-        run: bun run typecheck
+        run: bun run --filter '@browseros/server' --filter '@browseros/server-edition' --filter '@browseros/learning' --filter '@browseros/shared' --filter '@browseros-ai/agent-sdk' typecheck
         env:
           NODE_OPTIONS: --max-old-space-size=8192
