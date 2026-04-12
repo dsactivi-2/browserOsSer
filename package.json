@@ -47,7 +47,7 @@
     "picocolors": "^1.1.1",
     "rimraf": "^6.0.1",
     "typedoc": "^0.28.15",
-    "typescript": "^5.9.2"
+    "typescript": "^6.0.2"
   },
   "trustedDependencies": [
     "lefthook"

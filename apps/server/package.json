@@ -85,7 +85,7 @@
     "@types/node": "^24.3.3",
     "@types/ws": "^8.5.13",
     "puppeteer": "24.23.0",
-    "typescript": "^5.9.2"
+    "typescript": "^6.0.2"
   },
   "optionalDependencies": {
     "chrome-devtools-mcp": "latest"
